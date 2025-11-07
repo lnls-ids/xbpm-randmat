@@ -18,15 +18,15 @@ kdelta positions_scaling (double * xp, double * yp, roi_struct * roi)
 
     double sx2 = roi_dot_product(xp, xp, roi);
     double sx  = roi_vector_sum(xp, roi);
-    double det = roi->nsites * sx2 - sx * sx;
+    double det = (double)roi->nsites * sx2 - sx * sx;
 
     double sy  = roi_vector_sum(yp, roi);
     double sxy = roi_dot_product(xp, yp, roi);
 
     // DEBUG
-    // printf(" (position scaling) : nsites = %d\n", roi->nsites);
-    // for (int ii = 0; ii < roi->nsites; ii++)
-    //     printf(">>> [%d : %d] xp = %lf, yp = %lf\n", ii, roi->idx[ii],
+    // printf(" (position scaling) : nsites = %zu\n", roi->nsites);
+    // for (size_t ii = 0; ii < roi->nsites; ii++)
+    //     printf(">>> [%zu : %zu] xp = %lf, yp = %lf\n", ii, roi->idx[ii],
     //             xp[roi->idx[ii]], yp[roi->idx[ii]]);
 
     // printf(" (position scaling) :\n");
@@ -39,7 +39,7 @@ kdelta positions_scaling (double * xp, double * yp, roi_struct * roi)
     // DEBUG
 
     kd.delta = (sx2 * sy - sx * sxy) / det;
-    kd.k = (sy - roi->nsites * kd.delta) / sx;
+    kd.k = (sy - (double)roi->nsites * kd.delta) / sx;
 
     // DEBUG
     // printf("       k = %lf\n", kd.k);
@@ -54,15 +54,24 @@ kdelta positions_scaling (double * xp, double * yp, roi_struct * roi)
  * The gain matrix gain_v is applied to the blades' values
  * provided by dataset ds.
  */
-void raw_positions_calc_v (dataset * ds, double * gain, double * pos)
+void raw_positions_calc (dataset * ds, double * supmat,
+                         double * pos_h, double * pos_v)
 {
-    // double p0, p1, p2, p3;
-    double p1, p2;
-    for (int ii = 0; ii < ds->nsites; ii++)
+    /* Pointer to blades' values at each site.  */
+    double pblade[4];
+    /* Delta over sigma vector.  */
+    double deltasigma[4] = {0.0, 0.0, 0.0, 0.0};
+
+    for (size_t ii = 0; ii < ds->nsites; ii++)
     {
-        p1 = fabs(gain[0]) * ds->to[ii] + fabs(gain[1]) * ds->ti[ii];
-        p2 = fabs(gain[2]) * ds->bi[ii] + fabs(gain[3]) * ds->bo[ii];
-        pos[ii] = (p1 - p2) / (p1 + p2);
+        pblade[0] = ds->to[ii];
+        pblade[1] = ds->ti[ii];
+        pblade[2] = ds->bi[ii];
+        pblade[3] = ds->bo[ii];
+
+        matrix_vector_product(supmat + 8, (double *)pblade, 4, 4, deltasigma);
+        pos_h[ii] = (deltasigma[0] / deltasigma[1]);
+        pos_v[ii] = (deltasigma[2] / deltasigma[3]);
 
         // p0 = gain[0] * ds->to[ii];
         // p1 = gain[1] * ds->ti[ii];
@@ -82,7 +91,7 @@ void raw_positions_calc_v (dataset * ds, double * gain, double * pos)
 void raw_positions_calc_h (dataset * ds, double * gain, double * pos)
 {
     double p1, p2;
-    for (int ii = 0; ii < ds->nsites; ii++)
+    for (size_t ii = 0; ii < ds->nsites; ii++)
     {
         p1 = fabs(gain[0]) * ds->to[ii] + fabs(gain[3]) * ds->bo[ii];
         p2 = fabs(gain[1]) * ds->ti[ii] + fabs(gain[2]) * ds->bi[ii];
@@ -122,7 +131,7 @@ void positions_calc_h (dataset * ds, double * gain, double * pos)
         return;
 
 
-    for (int ii = 0; ii < ds->nsites; ii++)
+    for (size_t ii = 0; ii < ds->nsites; ii++)
     {
         pos[ii] = pos[ii] * kd.k - kd.delta;
     }
@@ -136,7 +145,7 @@ void positions_calc_v (dataset * ds, double * gain, double * pos)
 
     /* Scale positions. */
     kdelta kd = positions_scaling(pos, ds->nom_v, &(ds->roi));
-    for (int ii = 0; ii < ds->nsites; ii++)
+    for (size_t ii = 0; ii < ds->nsites; ii++)
     {
         pos[ii] = pos[ii] * kd.k - kd.delta;
     }

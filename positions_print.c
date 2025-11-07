@@ -7,8 +7,8 @@
  */
 void positions_print(dataset * ds, double * hh, double * vv)
 {
-    int ia;
-    for (int ii = 0; ii < ds->nsites; ii++)
+    size_t ia;
+    for (size_t ii = 0; ii < ds->nsites; ii++)
     {
         ia = ds->ord_sites[ii];
         printf("%12.4f %12.4f %12.4f %12.4f \n",

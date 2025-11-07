@@ -76,7 +76,7 @@ xbpm_prm parameters_read (int argc, char **argv)
             break;
         
         case 'n':                   /* Total number of sites. */
-            prm.nsites = atoi(optarg);
+            prm.nsites = (size_t) strtoul(optarg, NULL, 10);
             break;
         
         case 'r':                    /* Number of random changes. */

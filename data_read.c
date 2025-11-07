@@ -14,12 +14,12 @@ typedef struct
 
 /* Return the minimum and maximum values of a vector vv of size nn.
  */
-minmax min_and_max (double * vv, int nn)
+minmax min_and_max (double * vv, size_t nn)
 {
     minmax mm;
     mm.min = vv[0];
     mm.max = vv[0];
-    for (int ii = 1; ii < nn; ii++)
+    for (size_t ii = 1; ii < nn; ii++)
     {
         if (vv[ii] > mm.max)
             mm.max = vv[ii];
@@ -32,27 +32,27 @@ minmax min_and_max (double * vv, int nn)
 
 /* Check if a site has been visited. Used for debugging.
  */
-int site_visited (int * idx, int ic, int ivisit)
+int site_visited (size_t * idx, size_t ic, size_t ivisit)
 {
-    for (int ii = 0; ii < ic; ii++)
+    for (size_t ii = 0; ii < ic; ii++)
     {
         if (ivisit == idx[ii])
         {
-            printf(" True! ii = %d, ivisit = %d, idx = %d\n", 
+            printf(" True! ii = %zu, ivisit = %zu, idx = %zu\n",
                 ii, ivisit, idx[ii]);
             return 1;
         }
     }
-    printf(" False! ivisit = %d, idx = %d\n", ivisit, idx[ic]);
+    printf(" False! ivisit = %zu, idx = %zu\n", ivisit, idx[ic]);
     return 0;
 }
 
 
 /* Exchange the values of two integer variables (a and b).
  */
-void exchange_values(int * a, int * b)
+void exchange_values(size_t * a, size_t * b)
 {
-    int tmp = *a;
+    size_t tmp = *a;
     *a = *b;
     *b = tmp;
 }
@@ -65,10 +65,10 @@ void exchange_values(int * a, int * b)
  * positions given by the same index are correlated, namely, hh[i] and vv[i]
  * correspond to the same site.
  */
-int * index_order_by_position (double * hh, double * vv, int nsites)
+size_t * index_order_by_position (double * hh, double * vv, size_t nsites)
 {
-    int ic, jj, inext, icurr;
-    int * idx = calloc(nsites, sizeof(int));
+    size_t ic, jj, inext, icurr;
+    size_t * idx = calloc(nsites, sizeof(size_t));
     double next_h, next_v;
 
     /* Initialize index array. */
@@ -110,12 +110,12 @@ int * index_order_by_position (double * hh, double * vv, int nsites)
  */
 roi_struct roi_indexation (dataset * ds, xbpm_prm prm)
 {
-    int   icount = 0;
-    int * roi_sites = calloc(ds->nsites, sizeof(int));
-    int   ord_idx;
+    size_t   icount = 0;
+    size_t * roi_sites = calloc(ds->nsites, sizeof(size_t));
+    size_t   ord_idx;
     roi_struct roi;
 
-    for (int ii = 0; ii < ds->nsites; ii++)
+    for (size_t ii = 0; ii < ds->nsites; ii++)
     {
         ord_idx = ds->ord_sites[ii];
         if (ds->nom_h[ord_idx] >= prm.roi_from && 
@@ -127,31 +127,32 @@ roi_struct roi_indexation (dataset * ds, xbpm_prm prm)
                 roi_sites[icount++] = ord_idx;
             }
         }
-
     }
 
     /* Copy indexed sites to roi structure. */
     roi.nsites = icount;
-    roi.idx    = calloc(roi.nsites, sizeof(int));
-    memcpy(roi.idx, roi_sites, roi.nsites * sizeof(int));
+    roi.idx    = calloc(roi.nsites, sizeof(size_t));
+    memcpy(roi.idx, roi_sites, roi.nsites * sizeof(size_t));
     free(roi_sites);
     return roi;
 }
 
+
 /* Read matrix from file.
  */
-void matrix_read(char * matfile, double ** mat)
+void matrix_read(char * matfile, double * mat)
 {
-    int ii;
+    size_t ii;
     FILE * df = fopen(matfile, "r");
 
     for(ii = 0; ii < 4; ii++)
     {
         if(! fscanf(df, "%lf %lf %lf %lf",
-            &mat[ii][0], &mat[ii][1], &mat[ii][2], &mat[ii][3]))
+            &mat[4 * ii], &mat[4 * ii + 1],
+            &mat[4 * ii + 2], &mat[4 * ii + 3]))
         {
             printf(" WARNING (at matrix read) : could not read"
-                " from file %s at line (%d)", matfile, ii);
+                " from file %s at line (%zu)", matfile, ii);
         }
     }
     fclose(df);
@@ -166,7 +167,7 @@ dataset data_read(xbpm_prm prm)
     char line[MAX_LINE];
     char * pd, * parse;
     dataset ds;
-    int ii = 0;
+    size_t ii = 0;
     
     /* Check when opening data file. */
     if (df == NULL)
@@ -234,9 +235,9 @@ dataset data_read(xbpm_prm prm)
     // DEBUG
     /*
     printf("\n\n##### (DATA READ) ROI: #####\n");
-    for (int ii = 0; ii < ds.roi.nsites; ii++)
+    for (size_t ii = 0; ii < ds.roi.nsites; ii++)
     {
-        printf(" ii = %.4d,  roi idx = %.4d -> ORD = %d \n",
+        printf(" ii = %04zu,  roi idx = %04zu -> ORD = %zu \n",
         ii, ds.roi.idx[ii], ds.ord_sites[ds.roi.idx[ii]]);
     }
     printf("\n\n ########### \n\n");

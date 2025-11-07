@@ -18,17 +18,15 @@ double ** matrix_read(char * matfile, double ** supmat);
 dataset data_read(xbpm_prm prm);
 
 /* Perform a random walk with the gain matrix. */
-void random_walk(dataset * ds, xbpm_prm * prm,
-                 double * gain_h, double * gain_v,
+void random_walk(dataset * ds, xbpm_prm * prm, double * supmat,
                  double * pos_h, double * pos_v);
 
-
 /* Print coordinates of sites. */
-void positions_print(dataset * ds, double * hh, double * vv);
+void positions_print(dataset * ds, double * pos_h, double * pos_v);
 
 /* Calculate the positions. */
-int positions_calc_h (dataset * ds, double * gain_h, double * hh);
-int positions_calc_v (dataset * ds, double * gain_v, double * vv);
+int positions_calc(dataset * ds, double * supmat,
+                   double * pos_h, double * pos_v);
 
 
 /* Free up allocated memory. */
@@ -51,17 +49,18 @@ void dataset_free (dataset * ds)
 
 /* Print out matrix.
  */
-void matrix_show (double ** mat, int nn, int mm)
+void matrix_show (double * mat, size_t nn, size_t mm)
 {
-    int ii, jj;
+    size_t ii, jj;
     for (ii = 0; ii < nn; ii++)
     {
         for (jj = 0; jj < mm; jj++)
         {
-            printf(" %12.6lf  ", mat[ii][jj]);
+            printf(" %12.6lf  ", mat[ii * mm + jj]);
         }
         printf("\n");
     }
+    printf("\n");
 }
 
 
@@ -75,66 +74,53 @@ int main(int argc, char **argv)
     /* Read XBPM data from file. */
     dataset ds = data_read(prm);
 
-    int ii;
+    size_t ii;
     double gain_h[4] = {1., 1., 1., 1.};
     double gain_v[4] = {1., 1., 1., 1.};
-    double * hh  = calloc(prm.nsites, sizeof(double));
-    double * vv  = calloc(prm.nsites, sizeof(double));
+    double * pos_h  = calloc(prm.nsites, sizeof(double));
+    double * pos_v  = calloc(prm.nsites, sizeof(double));
 
-    /* The suppression matrix. */
-    double ** supmat = calloc(4, sizeof(double *));
-    for (ii = 0; ii < 4; ii++)
-    {
-        supmat[ii] = calloc(4, sizeof(double));
-    }
-
-    if (strlen(prm.matfile) != 0)
-    {   
+    /* Read initial suppression matrix from file if provided.
+    */
+   double * supmat = calloc(16, sizeof(double));
+   if (strlen(prm.matfile) != 0)
+   {   
         matrix_read(prm.matfile, supmat);
-        for (ii = 0; ii < 4; ii++)
-        {
-            gain_h[ii] = supmat[0][ii];
-            gain_v[ii] = supmat[2][ii];
-        }
         printf("\n##### Input matrix:\n");
         matrix_show(supmat, 4, 4);
         printf("#####\n");
+    } 
+    else
+    {
+        memcpy(supmat, supmat_signals, 16 * sizeof(double));
     }
 
     /* Perform the random walk of gain matrix's elements. */
-    random_walk(&ds, &prm, gain_h, gain_v, hh, vv);
+    random_walk(&ds, &prm, supmat, pos_h, pos_v);
 
     /* Show modified matrix. */
-    for (ii = 0; ii < 4; ii++)
-    {
-        supmat[0][ii] = gain_h[ii];
-        supmat[1][ii] = fabs(gain_h[ii]);
-        supmat[2][ii] = gain_v[ii];
-        supmat[3][ii] = fabs(gain_v[ii]);
-    }
     printf("\n##### Modified matrix:\n");
     matrix_show(supmat, 4, 4);
     printf("#####\n\n");
 
     /* Rescale positions. */
-    positions_calc_h(&ds, gain_h, hh);
-    positions_calc_v(&ds, gain_v, vv);
+    positions_calc(&ds, supmat, pos_h, pos_v);
 
     /* Print out final positions. */
     printf("# nom pos h, nom pos v, pos h, pos v\n");
-    positions_print(&ds, hh, vv);
+    positions_print(&ds, pos_h, pos_v);
 
     /* Free up allocated memory. */
     if (supmat != NULL)
     {
         for (ii = 0; ii < 4; ii++)
         {
-            free(supmat[ii]);
+            free(supmat);
         }
         free(supmat);
     }
     dataset_free(&ds);
-    free(hh);
-    free(vv);
+    free(pos_h);
+    free(pos_v);
     return 0;
 }
