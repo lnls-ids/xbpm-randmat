@@ -15,7 +15,7 @@ void mat_walk (double * gain, double step)
 {
     int isite   = (int) (pcg_double() * 4);           /* Pick an element.  */
     double sign = 1.0 ? -1.0 : (pcg_double() > 0.5);  /* Choose sign +/-.  */
-   gain[isite] += sign * step;          /* Increase step in element value. */
+    gain[isite] += sign * step;         /* Increase step in element value. */
 }
 
 
@@ -81,15 +81,17 @@ int random_walk(dataset * ds, xbpm_prm * prm,
     chi2_v_aft = chi2_v_bef;
 
     // DEBUG
-    // printf("\n##### (random walk) BEFORE #####\n");
-    // printf("\n\n >> gain << \n (random walk) H : \n");
-    // for (int ii = 0; ii < 4 ; ii++)
-    //     printf(" %10.4f  ", gain_h[ii]);
-    // printf("\n\n (random walk) V : \n ");
-    // for (int ii = 0; ii < 4 ; ii++)
-    //     printf(" %10.4f  ", gain_v[ii]);
-    // printf("\n\n");
-    // printf(" (random walk) H, V = %lf / %lf\n\n", pos_h[5], pos_v[5]);
+    /*
+    printf("\n##### (random walk) BEFORE #####\n");
+    printf("\n\n >> gain << \n (random walk) H : \n");
+    for (int ii = 0; ii < 4 ; ii++)
+    printf(" %10.4f  ", gain_h[ii]);
+    printf("\n\n (random walk) V : \n ");
+    for (int ii = 0; ii < 4 ; ii++)
+    printf(" %10.4f  ", gain_v[ii]);
+    printf("\n\n");
+    printf(" (random walk) H, V = %lf / %lf\n\n", pos_h[5], pos_v[5]);
+    */
     // DEBUG
 
     /* Try to change the matrix nrand times. */
@@ -112,15 +114,16 @@ int random_walk(dataset * ds, xbpm_prm * prm,
         }
 
         // DEBUG
-        // printf(" pos 0: H, V = %lf / %lf\n ", pos_h[0], pos_v[0]);
-
-        // for (int jj = 0; jj < 4; jj++)
-        // {
-        //     printf("h = %lf ", gain_h_tmp[jj]);
-        //     printf("v = %lf ", gain_v_tmp[jj]);
-        // }
-
-        // printf(" (random walk) chi2 = %lf , %lf\n", chi2_h_aft, chi2_v_aft);
+        /*
+        printf(" pos 0: H, V = %lf / %lf\n ", pos_h[0], pos_v[0]);
+        for (int jj = 0; jj < 4; jj++)
+        {
+            printf("h = %lf ", gain_h_tmp[jj]);
+            printf("v = %lf ", gain_v_tmp[jj]);
+        }
+        
+        printf(" (random walk) chi2 = %lf , %lf\n", chi2_h_aft, chi2_v_aft);
+        */
         // DEBUG
 
         /* Calculate the change in chi2. */
@@ -131,13 +134,12 @@ int random_walk(dataset * ds, xbpm_prm * prm,
             prob = 1.0;
 
         // DEBUG
-        // printf(" (random walk) AFT >> dchi2 = %lf - %lf = %lf ←→ %lf\n\n",
-        //         chi2_aft, chi2_bef, dchi2, exp(-dchi2 / prm->temp));
-        // DEBUG
-
-        // prob = (dchi2 < 0.0) ? 1.0 : exp(-dchi2 / prm->temp);
-        // DEBUG
-        // printf(" (random walk) >> prob = %lf ←→ %Lg\n", prob, pcg_double());
+        /*
+        printf(" (random walk) AFT >> dchi2 = %lf - %lf = %lf ←→ %lf\n\n",
+        chi2_aft, chi2_bef, dchi2, exp(-dchi2 / prm->temp));
+        prob = (dchi2 < 0.0) ? 1.0 : exp(-dchi2 / prm->temp);
+        printf(" (random walk) >> prob = %lf ←→ %Lg\n", prob, pcg_double());
+        */
         // DEBUG
 
         /* Accept or reject change. */
@@ -157,12 +159,14 @@ int random_walk(dataset * ds, xbpm_prm * prm,
     }
 
     // DEBUG
-    // printf(" gain: \n");
-    // for (int jj = 0; jj < 4; jj++)
-    // {
-    //     printf("H gain %d → %lf\t", jj, gain_h[jj]);
-    //     printf("V gain %d → %lf\n", jj, gain_v[jj]);
-    // }
+    /*
+    printf(" gain: \n");
+    for (int jj = 0; jj < 4; jj++)
+    {
+        printf("H gain %d → %lf\t", jj, gain_h[jj]);
+        printf("V gain %d → %lf\n", jj, gain_v[jj]);
+    }
+    */
     // DEBUG
 
     /* Final posistions. */
@@ -170,15 +174,17 @@ int random_walk(dataset * ds, xbpm_prm * prm,
     positions_calc_v(ds, gain_v, pos_v);
 
     // DEBUG
-    // printf("\n\n\n##### (random walk) AFTER #####\n");
-    // printf("\n\n >> gain << \n");
-    // for (int ii = 0; ii < 4 ; ii++)
-    //     printf(" %10.4f  ", gain_h[ii]);
-    // printf("\n");
-    // for (int ii = 0; ii < 4 ; ii++)
-    //     printf(" %10.4f  ", gain_v[ii]);
-    // printf("\n\n");
-    // printf("pos H, V = %lf / %lf\n\n", pos_h[5], pos_v[5]);
+    /*
+    printf("\n\n\n##### (random walk) AFTER #####\n");
+    printf("\n\n >> gain << \n");
+    for (int ii = 0; ii < 4 ; ii++)
+    printf(" %10.4f  ", gain_h[ii]);
+    printf("\n");
+    for (int ii = 0; ii < 4 ; ii++)
+    printf(" %10.4f  ", gain_v[ii]);
+    printf("\n\n");
+    printf("pos H, V = %lf / %lf\n\n", pos_h[5], pos_v[5]);
+    */
     // DEBUG
 
     free(gain_h_tmp);

@@ -30,6 +30,8 @@ minmax min_and_max (double * vv, int nn)
 }
 
 
+/* Check if a site has been visited. Used for debugging.
+ */
 int site_visited (int * idx, int ic, int ivisit)
 {
     for (int ii = 0; ii < ic; ii++)
@@ -128,6 +130,7 @@ roi_struct roi_indexation (dataset * ds, xbpm_prm prm)
 
     }
 
+    /* Copy indexed sites to roi structure. */
     roi.nsites = icount;
     roi.idx    = calloc(roi.nsites, sizeof(int));
     memcpy(roi.idx, roi_sites, roi.nsites * sizeof(int));
@@ -218,20 +221,27 @@ dataset data_read(xbpm_prm prm)
         ds.bo[ii]    = atof(strtok_r(NULL, " ", &pd));
         ds.sbo[ii]   = atof(strtok_r(NULL, " ", &pd));
 
-
         // DEBUG
         // printf("\n>> (DATA READ) ii = %d\n", ii);
         // DEBUG
 
         ii++;
     }
-
-    // DEBUG
-    // printf("\n>> (DATA READ) AFTER WHILE OK.\n");
-    // DEBUG
-
+    
     ds.ord_sites = index_order_by_position(ds.nom_h, ds.nom_v, ds.nsites);
     ds.roi       = roi_indexation(&ds, prm);
+
+    // DEBUG
+    /*
+    printf("\n\n##### (DATA READ) ROI: #####\n");
+    for (int ii = 0; ii < ds.roi.nsites; ii++)
+    {
+        printf(" ii = %.4d,  roi idx = %.4d -> ORD = %d \n",
+        ii, ds.roi.idx[ii], ds.ord_sites[ds.roi.idx[ii]]);
+    }
+    printf("\n\n ########### \n\n");
+    */
+    // DEBUG
 
     fclose(df);
     return ds;

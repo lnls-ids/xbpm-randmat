@@ -69,25 +69,11 @@ void matrix_show (double ** mat, int nn, int mm)
  */
 int main(int argc, char **argv)
 {
-
-    // DEBUG
-    // printf("\n (MAIN) OK zero.\n");
-    // DEBUG
-
     /* Read parameters from command line. */
     xbpm_prm prm = parameters_read(argc, argv);
 
-    // DEBUG
-    // printf("\n (MAIN) OK 1.\n");
-    // DEBUG
-
     /* Read XBPM data from file. */
     dataset ds = data_read(prm);
-
-    // DEBUG
-    // printf("\n (MAIN) OK 2.\n");
-    // fflush(stdout);
-    // DEBUG
 
     int ii;
     double gain_h[4] = {1., 1., 1., 1.};
@@ -102,18 +88,8 @@ int main(int argc, char **argv)
         supmat[ii] = calloc(4, sizeof(double));
     }
 
-    // DEBUG
-    // printf("\n (MAIN) MAT FILE BEFORE:  %s\n", prm.matfile);
-    // printf("\n (MAIN) MAT FILE CMP STATUS:  %d\n", strcmp(prm.matfile, ""));
-    // DEBUG
-
     if (strlen(prm.matfile) != 0)
     {   
-
-        // DEBUG
-        // printf("\n (MAIN) MAT FILE :  %s\n", prm.matfile);
-        // DEBUG
-
         matrix_read(prm.matfile, supmat);
         for (ii = 0; ii < 4; ii++)
         {
@@ -124,10 +100,6 @@ int main(int argc, char **argv)
         matrix_show(supmat, 4, 4);
         printf("#####\n");
     }
-
-    // DEBUG
-    // printf("\n (MAIN) MAT FILE =  %s\n", prm.matfile);
-    // DEBUG
 
     /* Perform the random walk of gain matrix's elements. */
     random_walk(&ds, &prm, gain_h, gain_v, hh, vv);
@@ -145,7 +117,6 @@ int main(int argc, char **argv)
     printf("#####\n\n");
 
     /* Rescale positions. */
-
     positions_calc_h(&ds, gain_h, hh);
     positions_calc_v(&ds, gain_v, vv);
 
