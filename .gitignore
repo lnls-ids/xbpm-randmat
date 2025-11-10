@@ -326,3 +326,4 @@ beam_*
 tests*
 lib/
 mc_search
+res.dat

@@ -122,6 +122,12 @@ size_t random_walk(dataset * ds, xbpm_prm * prm, double * supmat,
    
     /* Temporary copy of suppression matrix. */
     double * supmat_tmp = calloc(16, sizeof(double));
+    if (supmat_tmp == NULL)
+    {
+        printf(" ERROR (random_walk): could not allocate memory"
+            " for temporary suppression matrix. Aborting.\n");
+        exit(-1);
+    }
     memcpy(supmat_tmp, supmat, 16 * sizeof(double));
 
     /* Try to change the matrix nrand times. */
