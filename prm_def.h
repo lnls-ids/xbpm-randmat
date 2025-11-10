@@ -1,5 +1,6 @@
 #ifndef PRM
 #define PRM
+
 #define MAX_LINE 1024
 #include <stddef.h>
 
@@ -55,12 +56,7 @@ typedef struct
 /* The basic suppression matrix, defining the signals for horizontal 
  * and vertical calculations of beam position. 
  */
-double supmat_signals[16] = {
-    1.0,   1.0,  -1.0,  -1.0,
-    1.0,   1.0,   1.0,   1.0,
-    1.0,  -1.0,  -1.0,   1.0,
-    1.0,   1.0,   1.0,   1.0
-};
+extern double supmat_signs[16];
 
 
 /* The basic pairwise blades calculation matrix.

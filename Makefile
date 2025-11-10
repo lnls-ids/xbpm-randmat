@@ -32,6 +32,7 @@ ALL: mc_search
 mc_search:               \
 ${L}/main.o              \
 ${L}/help.o              \
+${L}/matrix_operations.o \
 ${L}/parameters_read.o   \
 ${L}/data_read.o         \
 ${L}/random_walk.o       \
@@ -44,15 +45,19 @@ ${L}/main.o:             \
 main.c                   \
 pcg_random.h             \
 prm_def.h                \
-parameters_read.c        \
-data_read.c               
+${L}/parameters_read.o   \
+${L}/data_read.o 		 \
+${L}/positions_calc.o    \
+${L}/positions_print.o   \
+${L}/random_walk.o       \
+${L}/help.o
 	gcc -o $@ $< ${CFLAGS} -c
 
 
 ${L}/parameters_read.o:  \
 parameters_read.c        \
 prm_def.h                \
-help.c 
+${L}/help.o
 	gcc -o $@ $< ${CFLAGS} -c
 
 ${L}/data_read.o:        \
@@ -60,16 +65,18 @@ data_read.c              \
 prm_def.h
 	gcc -o $@ $< ${CFLAGS}  -c
 
-${L}/position_calc.o:    \
-position_calc.c
+${L}/matrix_operations.o: \
+matrix_operations.c       \
+prm_def.h
+	gcc -o $@ $< ${CFLAGS} -c
+
+${L}/positions_calc.o:   \
+positions_calc.c         \
+prm_def.h
 	gcc -o $@ $< ${CFLAGS} -c
 
 ${L}/positions_print.o:  \
 positions_print.c
-	gcc -o $@ $< ${CFLAGS} -c
-
-${L}/positions_calc.o:   \
-positions_calc.c
 	gcc -o $@ $< ${CFLAGS} -c
 
 ${L}/random_walk.o:      \

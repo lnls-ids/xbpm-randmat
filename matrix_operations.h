@@ -27,7 +27,9 @@ double dot_product(const double *mA, const double *mB, size_t nn);
 double vector_sum(const double *mA, size_t nn);
 
 /* ROI-aware helpers (operate on flat vectors indexed by roi->idx). */
-double roi_dot_product(const double *mA, const double *mB, roi_struct *roi);
-double roi_vector_sum(const double *mA, roi_struct *roi);
+double roi_dot_product(const double *mA, const double *mB,
+                       const roi_struct *roi);
+
+double roi_vector_sum(const double *mA, const roi_struct *roi);
 
 #endif

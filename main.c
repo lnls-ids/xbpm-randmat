@@ -7,30 +7,38 @@
 #define NLIN 4
 #define NCOL 4
 
+/* Basic suppression matrix. */
+double supmat_signs[16] = {
+    1.0,   1.0,  -1.0,  -1.0,
+    1.0,   1.0,   1.0,   1.0,
+    1.0,  -1.0,  -1.0,   1.0,
+    1.0,   1.0,   1.0,   1.0
+};
+
+
 /* Prototypes.      */
 /* Read parameters. */
 xbpm_prm parameters_read(int argc, char **argv);
 
 /* Read matrix from file. */
-double ** matrix_read(char * matfile, double ** supmat);
+double * matrix_read(char * matfile, double * supmat);
 
 /* Read data from file. */
 dataset data_read(xbpm_prm prm);
 
 /* Perform a random walk with the gain matrix. */
-void random_walk(dataset * ds, xbpm_prm * prm, double * supmat,
-                 double * pos_h, double * pos_v);
+size_t random_walk(dataset * ds, xbpm_prm * prm, double * supmat,
+                   double * pos_h, double * pos_v);
 
 /* Print coordinates of sites. */
 void positions_print(dataset * ds, double * pos_h, double * pos_v);
 
 /* Calculate the positions. */
-int positions_calc(dataset * ds, double * supmat,
-                   double * pos_h, double * pos_v);
+kdelta positions_calc(dataset * ds, double * supmat, double * pos);
 
 
 /* Free up allocated memory. */
-void dataset_free (dataset * ds)
+void dataset_free (dataset * ds, double * pos_h, double * pos_v)
 {
     free(ds->nom_h);
     free(ds->nom_v);
@@ -68,20 +76,17 @@ void matrix_show (double * mat, size_t nn, size_t mm)
  */
 int main(int argc, char **argv)
 {
+    size_t accept;
+    size_t ii;
+
     /* Read parameters from command line. */
     xbpm_prm prm = parameters_read(argc, argv);
 
     /* Read XBPM data from file. */
     dataset ds = data_read(prm);
 
-    size_t ii;
-    double gain_h[4] = {1., 1., 1., 1.};
-    double gain_v[4] = {1., 1., 1., 1.};
-    double * pos_h  = calloc(prm.nsites, sizeof(double));
-    double * pos_v  = calloc(prm.nsites, sizeof(double));
 
-    /* Read initial suppression matrix from file if provided.
-    */
+    /* Read initial suppression matrix from file if provided. */
    double * supmat = calloc(16, sizeof(double));
    if (strlen(prm.matfile) != 0)
    {   
@@ -92,11 +97,14 @@ int main(int argc, char **argv)
     } 
     else
     {
-        memcpy(supmat, supmat_signals, 16 * sizeof(double));
+        /* Start with default suppression matrix. */
+        memcpy(supmat, supmat_signs, 16 * sizeof(double));
     }
 
-    /* Perform the random walk of gain matrix's elements. */
-    random_walk(&ds, &prm, supmat, pos_h, pos_v);
+    /* Perform the random walk of suppression matrix's elements. */
+    double * pos_h  = calloc(prm.nsites, sizeof(double));
+    double * pos_v  = calloc(prm.nsites, sizeof(double));
+    accept = random_walk(&ds, &prm, supmat, pos_h, pos_v);
 
     /* Show modified matrix. */
     printf("\n##### Modified matrix:\n");
@@ -104,11 +112,18 @@ int main(int argc, char **argv)
     printf("#####\n\n");
 
     /* Rescale positions. */
-    positions_calc(&ds, supmat, pos_h, pos_v);
+    kdelta kdh = positions_calc(&ds, supmat, pos_h);
+    kdelta kdv = positions_calc(&ds, supmat + 8, pos_v);
 
     /* Print out final positions. */
     printf("# nom pos h, nom pos v, pos h, pos v\n");
     positions_print(&ds, pos_h, pos_v);
+
+    printf("\n Rescaling parameters:");
+    printf("\n Horizontal: k = %lf, delta = %lf\n", kdh.k, kdh.delta);
+    printf("\n Vertical:   k = %lf, delta = %lf\n", kdv.k, kdv.delta);
+    printf("\n Acceptance rate: %lf %% \n",
+           ((double) accept / (double) prm.nrand) * 100.0);
 
     /* Free up allocated memory. */
     if (supmat != NULL)
@@ -119,8 +134,6 @@ int main(int argc, char **argv)
         }
         free(supmat);
     }
-    dataset_free(&ds);
-    free(pos_h);
-    free(pos_v);
+    dataset_free(&ds, pos_h, pos_v);
     return 0;
 }
