@@ -79,7 +79,7 @@ void raw_positions_calc (const dataset * ds, const double * supmat,
  * Then scale calculated positions based on nominal positions.
  */
 kdelta positions_calc (const dataset * ds, const double * supmat,
-                       double * pos)
+                       const double * nompos, double * pos)
 {
     /* Calculate positions according to suppression matrix. */
     raw_positions_calc(ds, supmat, pos);
@@ -90,7 +90,7 @@ kdelta positions_calc (const dataset * ds, const double * supmat,
     // DEBUG
 
     /* Scale positions. */
-    kdelta kd = positions_scaling(pos, ds->nom_h, &(ds->roi));
+    kdelta kd = positions_scaling(pos, nompos, &(ds->roi));
 
     // DEBUG
     // printf(" (pos calc h) scaling: k, delta = %lf , %lf \n\n",

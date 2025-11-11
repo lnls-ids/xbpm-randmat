@@ -117,13 +117,38 @@ size_t * index_order_by_position (double * hh, double * vv, size_t nsites)
 
 /* Create an index structure for the ROI.
  */
-roi_struct roi_indexation (dataset * ds, xbpm_prm prm)
+roi_struct roi_indexation (const dataset * ds, xbpm_prm * prm)
 {
-    size_t ord_idx;
+    size_t ord_idx, ii;
     size_t * roisite;
-    roi_struct roi;
+    
+    minmax mm_h = min_and_max(ds->nom_h, ds->nsites);
+    minmax mm_v = min_and_max(ds->nom_v, ds->nsites);
+    if (prm->roi_from < mm_h.min || prm->roi_to > mm_h.max ||
+        prm->roi_from < mm_v.min || prm->roi_to > mm_v.max)
+    {
+        printf(" WARNING (roi_indexation): ROI interval [%.4lf, %.4lf]"
+               " is out of bounds.\n"
+               " Horizontal min/max = [%.4lf, %.4lf]\n"
+               " Vertical   min/max = [%.4lf, %.4lf]\n",
+               prm->roi_from, prm->roi_to,
+               mm_h.min, mm_h.max, mm_v.min, mm_v.max);
+        printf("Reseting ROI to safety range:\n");
+        prm->roi_from = (mm_h.min < mm_v.min) ? mm_h.min : mm_v.min;
+        prm->roi_to   = (mm_h.max < mm_v.max) ? mm_h.max : mm_v.max;
+        printf(" New ROI interval = [%.4lf, %.4lf]\n",
+                prm->roi_from, prm->roi_to);
+    }
+
+    // DEBUG
+    // printf("##### (ROI INDEXATION) ROI interval = [%.4lf, %.4lf]\n",
+    //     prm->roi_from, prm->roi_to);
+    // DEBUG
 
     /* Initialize ROI structure. */
+    roi_struct roi;
+    roi.nsites = 0;
+    roi.idx = NULL;
     roisite = calloc(ds->nsites, sizeof(size_t));
     if (roisite == NULL)
     {
@@ -133,28 +158,49 @@ roi_struct roi_indexation (dataset * ds, xbpm_prm prm)
     }
 
     /* Run through all sites. */
-    for (size_t ii = 0; ii < ds->nsites; ii++)
+    size_t icount = 0;
+    for (ii = 0; ii < ds->nsites; ii++)
     {
         /* Index of grid-ordered sites. */
         ord_idx = ds->ord_sites[ii];
 
         /* Horizontal range. If site is within horizontal interval,
          * check whether it is in vertical interval as well.*/
-        if (ds->nom_h[ord_idx] >= prm.roi_from && 
-            ds->nom_h[ord_idx] <= prm.roi_to)
+        if (ds->nom_h[ord_idx] >= prm->roi_from && 
+            ds->nom_h[ord_idx] <= prm->roi_to)
         {
             /* Vertical range. If site is within vertical interval, 
              * it is added to the ROI. */
-            if (ds->nom_v[ord_idx] >= prm.roi_from &&
-                ds->nom_v[ord_idx] <= prm.roi_to)
+            if (ds->nom_v[ord_idx] >= prm->roi_from &&
+                ds->nom_v[ord_idx] <= prm->roi_to)
             {
-                roisite[roi.nsites++] = ord_idx;
+                roisite[icount++] = ord_idx;
             }
         }
     }
 
+    roi.nsites = icount;
     roi.idx = calloc(roi.nsites, sizeof(size_t));
     memcpy(roi.idx, roisite, roi.nsites * sizeof(size_t));
+
+
+    // DEBUG
+    // printf("\n##### (ROI INDEXATION) ROI sites: #####\n");
+    // for (size_t ii = 0; ii < roi.nsites; ii++)
+    // {
+    //     ord_idx = roi.idx[ii];
+    //     printf(" ii = %04zu,  roi idx = %04zu -> ORD = %zu ->",
+    //            ii, ord_idx, ds->ord_sites[ord_idx]);
+    //     printf(" h = %lf, v = %lf ::", ds->nom_h[ord_idx], ds->nom_v[ord_idx]);
+    //     printf(" to = %lf, ti = %lf, bo = %lf, bi = %lf \n",
+    //            ds->to[ord_idx], ds->ti[ord_idx],
+    //            ds->bo[ord_idx], ds->bi[ord_idx]);
+    // }
+    // printf("\n\n ########### \n\n");
+    // fflush(stdout);
+    // DEBUG
+
+
     free(roisite);
     return roi;
 }
@@ -183,9 +229,9 @@ void matrix_read(char * matfile, double * mat)
 
 /* Read data from file.
  */
-dataset data_read(xbpm_prm prm)
+dataset data_read(xbpm_prm * prm)
 {
-    FILE * df = fopen(prm.datafile, "r");
+    FILE * df = fopen(prm->datafile, "r");
     char line[MAX_LINE];
     char * pd, * parse;
     dataset ds;
@@ -194,27 +240,27 @@ dataset data_read(xbpm_prm prm)
     /* Check when opening data file. */
     if (df == NULL)
     {
-        perror(prm.datafile);
+        perror(prm->datafile);
         printf("##### (data_read) file: '%s'\n"
-            "ERROR: Aborting.\n\n", prm.datafile);
+            "ERROR: Aborting.\n\n", prm->datafile);
             exit(-1);
     }
 
     /* Allocate space for data. */
-    ds.nsites = prm.nsites;
+    ds.nsites = prm->nsites;
 
-    ds.nom_h = calloc(prm.nsites, sizeof(double));
-    ds.nom_v = calloc(prm.nsites, sizeof(double));
+    ds.nom_h = calloc(prm->nsites, sizeof(double));
+    ds.nom_v = calloc(prm->nsites, sizeof(double));
 
-    ds.to    = calloc(prm.nsites, sizeof(double));
-    ds.ti    = calloc(prm.nsites, sizeof(double));
-    ds.bi    = calloc(prm.nsites, sizeof(double));
-    ds.bo    = calloc(prm.nsites, sizeof(double));
+    ds.to    = calloc(prm->nsites, sizeof(double));
+    ds.ti    = calloc(prm->nsites, sizeof(double));
+    ds.bi    = calloc(prm->nsites, sizeof(double));
+    ds.bo    = calloc(prm->nsites, sizeof(double));
 
-    ds.sto   = calloc(prm.nsites, sizeof(double));
-    ds.sti   = calloc(prm.nsites, sizeof(double));
-    ds.sbi   = calloc(prm.nsites, sizeof(double));
-    ds.sbo   = calloc(prm.nsites, sizeof(double));
+    ds.sto   = calloc(prm->nsites, sizeof(double));
+    ds.sti   = calloc(prm->nsites, sizeof(double));
+    ds.sbi   = calloc(prm->nsites, sizeof(double));
+    ds.sbo   = calloc(prm->nsites, sizeof(double));
 
     if (ds.nom_h == NULL || ds.nom_v == NULL ||
         ds.to    == NULL || ds.ti    == NULL ||
@@ -228,7 +274,7 @@ dataset data_read(xbpm_prm prm)
     }
 
     // DEBUG
-    printf("\n>> (DATA READ) OK 1.\n");
+    // printf("\n>> (DATA READ) OK 1.\n");
     // DEBUG
 
     while (fgets(line, sizeof(line), df) != NULL)
@@ -254,21 +300,21 @@ dataset data_read(xbpm_prm prm)
         ds.sbo[nsite]   = atof(strtok_r(NULL, " ", &pd));
 
         // DEBUG
-        printf("\n>> (DATA READ) nsites = %zu\n", nsite);
+        // printf("\n>> (DATA READ) nsites = %zu\n", nsite);
         // DEBUG
 
         nsite++;
     }
 
     // DEBUG
-    printf("\n\n##### (DATA READ) ROI: #####\n");
-    for (size_t ii = 0; ii < nsite; ii++)
-    {
-        printf(" ii = %04zu,  h = %lf, v = %lf \n",
-               ii, ds.nom_h[ii], ds.nom_v[ii]);
-    }
-    printf("\n\n ########### \n\n");
-    fflush(stdout);
+    // printf("\n\n##### (DATA READ) ROI: #####\n");
+    // for (size_t ii = 0; ii < nsite; ii++)
+    // {
+    //     printf(" ii = %04zu,  h = %lf, v = %lf \n",
+    //            ii, ds.nom_h[ii], ds.nom_v[ii]);
+    // }
+    // printf("\n\n ########### \n\n");
+    // fflush(stdout);
     // DEBUG
     
 
@@ -276,14 +322,16 @@ dataset data_read(xbpm_prm prm)
     ds.roi       = roi_indexation(&ds, prm);
 
     // DEBUG
-    printf("\n\n##### (DATA READ) ROI: #####\n");
-    for (size_t ii = 0; ii < ds.roi.nsites; ii++)
-    {
-        printf(" ii = %04zu,  roi idx = %04zu -> ORD = %zu \n",
-        ii, ds.roi.idx[ii], ds.ord_sites[ds.roi.idx[ii]]);
-    }
-    printf("\n\n ########### \n\n");
-    fflush(stdout);
+    // printf("\n\n##### (DATA READ) ROI: #####\n");
+    // for (size_t idx, ii = 0; ii < ds.roi.nsites; ii++)
+    // {
+    //     idx = ds.roi.idx[ii];
+    //     printf(" ii = %04zu,  roi idx = %04zu -> ORD = %zu ->",
+    //             ii, idx, ds.ord_sites[idx]);
+    //     printf(" h = %lf, v = %lf \n", ds.nom_h[idx], ds.nom_v[idx]);
+    // }
+    // printf("\n\n ########### \n\n");
+    // fflush(stdout);
     // DEBUG
 
     fclose(df);

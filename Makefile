@@ -25,8 +25,8 @@ VFLAGS_LPK = -Wall -O0 -g -march=native -mtune=native ${LPCK_FLAGS} -lm
 VFLAGS = -Wall -O0 -g -march=native -mtune=native -lm
 
 # Default flags.
-# CFLAGS = ${CFLAGS_S}
-CFLAGS = ${VFLAGS}
+CFLAGS = ${CFLAGS_S}
+# CFLAGS = ${VFLAGS}
 
 ALL: mc_search
 

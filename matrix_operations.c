@@ -12,7 +12,8 @@
  * element (j,i) is matT[j * mm + i]. Caller must free the returned
  * pointer with free().
  */
-double *matrix_transpose(const double *mat, size_t mm, size_t nn)
+double *matrix_transpose(const double *mat,
+                         const size_t mm, const size_t nn)
 {
     if (mm <= 0 || nn <= 0 || mat == NULL) return NULL;
     size_t totsz = mm * nn;
@@ -36,7 +37,8 @@ double *matrix_transpose(const double *mat, size_t mm, size_t nn)
  * prod can be pre-zeroed or the function will accumulate into it.
  */
 double *matrix_product(const double *mA, const double *mB,
-                       size_t mm, size_t nn, size_t pp, double *prod)
+                       const size_t mm, const size_t nn, const size_t pp,
+                       double *prod)
 {
     if (!mA || !mB || !prod || mm == 0 || nn == 0 || pp == 0) return prod;
 
@@ -57,7 +59,7 @@ double *matrix_product(const double *mA, const double *mB,
  * prod must be mm-sized and will be filled with results.
  */
 void matrix_vector_product(const double *mA, const double *vv,
-                           size_t mm, size_t nn, double *prod)
+                           const size_t mm, const size_t nn, double *prod)
 {
     if (!mA || !vv || !prod || mm == 0 || nn == 0) return;
 
@@ -74,7 +76,7 @@ void matrix_vector_product(const double *mA, const double *vv,
 /* Calculate the dot product of nn-size line matrix mA and
  * column matrix mB.
  */
-double dot_product(const double *mA, const double *mB, size_t nn)
+double dot_product(const double *mA, const double *mB, const size_t nn)
 {
     double dprod = 0.0;
     for (size_t ii = 0; ii < nn; ii++)
@@ -87,7 +89,7 @@ double dot_product(const double *mA, const double *mB, size_t nn)
 
 /* Add up the elements of an nn sized vector mA (column matrix).
 */
-double vector_sum(const double *mA, size_t nn)
+double vector_sum(const double *mA, const size_t nn)
 {
     double sum = 0.0;
     for (size_t ii = 0; ii < nn; ii++)
@@ -106,9 +108,10 @@ double roi_dot_product(const double *mA, const double *mB,
                        const roi_struct * roi)
 {
     double dprod = 0.0;
+    size_t idx;
     for (size_t ii = 0; ii < roi->nsites; ii++)
     {
-        size_t idx = roi->idx[ii];
+        idx = roi->idx[ii];
         dprod += mA[idx] * mB[idx];
     }
     return dprod;

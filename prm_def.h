@@ -15,6 +15,7 @@ typedef struct
     double roi_from, roi_to;    /* Interval that defines the ROI. */
     double temp;                /* Temperature.                   */
     double step;                /* Random step size.              */
+    char outfile[256];          /* Output file name.              */
 } xbpm_prm;
 
 
@@ -31,9 +32,9 @@ typedef struct
  */
 typedef struct
 {
-    size_t nsites;           /* Number of sites.                            */
-    size_t * ord_sites;      /* Indices for the correct order of positions. */
-    double * nom_h, * nom_v; /* Nominal values of positions (sites).        */
+    size_t nsites;           /* Number of sites.                         */
+    size_t * ord_sites;      /* Indices for the correct position order.  */
+    double * nom_h, * nom_v; /* Nominal values of positions (sites).     */
 
     /* Pointers to blades' currents and std devs.   */
     double * to, * sto;         /* Top, out.        */

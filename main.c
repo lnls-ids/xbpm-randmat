@@ -16,16 +16,19 @@ xbpm_prm parameters_read(int argc, char **argv);
 double * matrix_read(char * matfile, double * supmat);
 
 /* Read data from file. */
-dataset data_read(xbpm_prm prm);
+dataset data_read(xbpm_prm * prm);
 
 /* Perform a random walk with the gain matrix. */
 size_t random_walk(dataset * ds, xbpm_prm * prm, double * supmat,
     double * pos_h, double * pos_v);
 
 /* Print coordinates of sites. */
-void positions_print(dataset * ds, double * pos_h, double * pos_v);
+void positions_print(const dataset * ds,
+                     const double * pos_h, const double * pos_v,
+                     const char * outfile);
 
-kdelta positions_calc(dataset * ds, double * supmat, double * pos);
+kdelta positions_calc(const dataset * ds, const double * supmat,
+                      const double * nompos, double * pos);
 
 /* Basic suppression matrix. */
 double supmat_signs[16] = {
@@ -35,29 +38,33 @@ double supmat_signs[16] = {
     1.0,   1.0,   1.0,   1.0
 };
 
-/* Calculate the positions. */
-/* Free up allocated memory. */
-void dataset_free (dataset * ds, double * pos_h, double * pos_v,
-                   double * supmat)
+/* Read suppresssion matrix.
+ */
+double * suppression_matrix_read(char * matfile)
 {
-    free(ds->nom_h);
-    free(ds->nom_v);
-    free(ds->to);
-    free(ds->ti);
-    free(ds->bi);
-    free(ds->bo);
-    free(ds->sto);
-    free(ds->sti);
-    free(ds->sbi);
-    free(ds->sbo);
-    free(ds->ord_sites);
-    free(ds->roi.idx);
-    free(supmat);
+    double * supmat = calloc(16, sizeof(double));
+    if (supmat == NULL)
+    {
+        printf(" ERROR (main): could not allocate memory"
+            " for suppression matrix. Aborting.\n");
+        exit(-1);
+    }
+
+    if (strlen(matfile) != 0)
+    {   
+        matrix_read(matfile, supmat);
+    } 
+    else
+    {
+        /* Start with default suppression matrix. */
+        memcpy(supmat, supmat_signs, 16 * sizeof(double));
+    }
+    return supmat;
 }
 
 
 /* Print out matrix.
- */
+*/
 void matrix_show (double * mat, size_t nn, size_t mm)
 {
     size_t ii, jj;
@@ -73,41 +80,55 @@ void matrix_show (double * mat, size_t nn, size_t mm)
 }
 
 
-/*
+/* Print scaling parameters.
+ */
+void scaling_params_print (kdelta kdh, kdelta kdv,
+                           size_t accept, size_t nrand)
+{
+    printf("\n Rescaling parameters:");
+    printf("\n Horizontal: k = %lf, delta = %lf\n", kdh.k, kdh.delta);
+    printf("\n Vertical:   k = %lf, delta = %lf\n", kdv.k, kdv.delta);
+    printf("\n Acceptance rate: %lf %% \n",
+           ((double) accept / (double) nrand) * 100.0);
+    printf("\n");
+}
+
+/* Free up allocated memory. */
+void dataset_free (dataset * ds, double * supmat,
+                   double * pos_h, double * pos_v)
+{
+    free(ds->nom_h);
+    free(ds->nom_v);
+    free(ds->to);
+    free(ds->ti);
+    free(ds->bi);
+    free(ds->bo);
+    free(ds->sto);
+    free(ds->sti);
+    free(ds->sbi);
+    free(ds->sbo);
+    free(ds->ord_sites);
+    free(ds->roi.idx);
+    free(supmat);
+    free(pos_h);
+    free(pos_v);
+}
+
+
+/* Main program.
  */
 int main(int argc, char **argv)
 {
-    size_t accept;
-
     /* Read parameters from command line. */
     xbpm_prm prm = parameters_read(argc, argv);
 
     /* Read XBPM data from file. */
-    dataset ds = data_read(prm);
-
+    dataset ds = data_read(&prm);
 
     /* Read initial suppression matrix from file if provided. */
-    double * supmat = calloc(16, sizeof(double));
-    if (supmat == NULL)
-    {
-        printf(" ERROR (main): could not allocate memory"
-            " for suppression matrix. Aborting.\n");
-        exit(-1);
-    }
-
-
-   if (strlen(prm.matfile) != 0)
-   {   
-        matrix_read(prm.matfile, supmat);
-        printf("\n##### Input matrix:\n");
-        matrix_show(supmat, 4, 4);
-        printf("#####\n");
-    } 
-    else
-    {
-        /* Start with default suppression matrix. */
-        memcpy(supmat, supmat_signs, 16 * sizeof(double));
-    }
+    double * supmat = suppression_matrix_read(prm.matfile);
+    printf("\n##### Input matrix:\n");
+    matrix_show(supmat, 4, 4);
 
     /* Perform the random walk of suppression matrix's elements. */
     double * pos_h  = calloc(prm.nsites, sizeof(double));
@@ -115,31 +136,26 @@ int main(int argc, char **argv)
     if (pos_h == NULL || pos_v == NULL)
     {
         printf(" ERROR (main): could not allocate memory"
-            " for position arrays. Aborting.\n");
+               " for position arrays. Aborting.\n");
         exit(-1);
     }
-    accept = random_walk(&ds, &prm, supmat, pos_h, pos_v);
+    size_t accept = random_walk(&ds, &prm, supmat, pos_h, pos_v);
 
     /* Show modified matrix. */
     printf("\n##### Modified matrix:\n");
     matrix_show(supmat, 4, 4);
-    printf("#####\n\n");
 
     /* Rescale positions. */
-    kdelta kdh = positions_calc(&ds, supmat, pos_h);
-    kdelta kdv = positions_calc(&ds, supmat + 8, pos_v);
+    kdelta kdh = positions_calc(&ds, supmat, ds.nom_h, pos_h);
+    kdelta kdv = positions_calc(&ds, supmat + 8, ds.nom_v, pos_v);
 
     /* Print out final positions. */
-    printf("# nom pos h, nom pos v, pos h, pos v\n");
-    positions_print(&ds, pos_h, pos_v);
+    positions_print(&ds, pos_h, pos_v, prm.outfile);
 
-    printf("\n Rescaling parameters:");
-    printf("\n Horizontal: k = %lf, delta = %lf\n", kdh.k, kdh.delta);
-    printf("\n Vertical:   k = %lf, delta = %lf\n", kdv.k, kdv.delta);
-    printf("\n Acceptance rate: %lf %% \n",
-           ((double) accept / (double) prm.nrand) * 100.0);
+    /* Print final scaling parameters. */
+    scaling_params_print(kdh, kdv, accept, prm.nrand);
 
     /* Free up allocated memory. */
-    dataset_free(&ds, pos_h, pos_v, supmat);
+    dataset_free(&ds, supmat, pos_h, pos_v);
     return 0;
 }
