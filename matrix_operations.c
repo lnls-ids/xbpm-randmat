@@ -4,78 +4,82 @@
 #ifndef MAT_OP
 #define MAT_OP
 
-/* Return the transpose matT of a matrix mat, given its size mm x nn.
- * 
- */
-double ** matrix_transpose(double ** mat, int mm, int nn)
-{
-    int ii, jj;
-    double ** matT = calloc(mm, sizeof(double *));
-    for (ii = 0; ii < mm; ii++)
-    {
-        matT[ii] = calloc(nn, sizeof(double));
-    }
 
-    for (ii = 0; ii < mm; ii++)
-    {
-        for (jj = 0; ii < mm; ii++)
-        {
-            matT[ii][jj] = mat[jj][ii];
+/* Return the transpose matT of a mm x nn matrix mat.
+ * The matrix is provided as a flat row-major array of size mm * nn:
+ * element (i,j) is mat[i * nn + j]. The result is returned as a
+ * newly allocated flat row-major array of size nn * mm such that
+ * element (j,i) is matT[j * mm + i]. Caller must free the returned
+ * pointer with free().
+ */
+double *matrix_transpose(const double *mat,
+                         const size_t mm, const size_t nn)
+{
+    if (mm <= 0 || nn <= 0 || mat == NULL) return NULL;
+    size_t totsz = mm * nn;
+    double *matT = malloc(totsz * sizeof(double));
+    if (!matT) return NULL;
+    for (size_t i = 0; i < mm; ++i) {
+        for (size_t j = 0; j < nn; ++j) {
+            /* mat[i,j] -> matT[j,i] */
+            matT[j * mm + i] = mat[i * nn + j];
         }
     }
-
     return matT;
 }
 
 
 /* Calculate the product pr of an (mm x nn) matrix mA by an
- * (nn x pp) matrix mB. Returns the mm x pp matrix pr.
+ * (nn x pp) matrix mB. All matrices are flat row-major arrays:
+ * mA: mm x nn (index i*nn + k)
+ * mB: nn x pp (index k*pp + j)
+ * prod: mm x pp (index i*pp + j) and must be allocated by caller.
+ * prod can be pre-zeroed or the function will accumulate into it.
  */
-double ** matrix_product(double ** mA, double ** mB, 
-                         int mm, int nn, int pp, double ** prod)
+double *matrix_product(const double *mA, const double *mB,
+                       const size_t mm, const size_t nn, const size_t pp,
+                       double *prod)
 {
-    int ii, jj, kk;
+    if (!mA || !mB || !prod || mm == 0 || nn == 0 || pp == 0) return prod;
 
-    for (ii = 0; ii < mm; ii++)
-    {
-        for (jj = 0; jj < pp; jj++)
-        {
-            for (kk = 0; kk < nn; kk++)
-            {
-                prod[ii][jj] += mA[ii][kk] * mB[kk][jj];
+    for (size_t i = 0; i < mm; ++i) {
+        for (size_t j = 0; j < pp; ++j) {
+            double sum = 0.0;
+            for (size_t k = 0; k < nn; ++k) {
+                sum += mA[i * nn + k] * mB[k * pp + j];
             }
+            prod[i * pp + j] = sum;
         }
     }
     return prod;
 }
 
 
-/* Calculate the product pr of an (mm x nn)-matrix mA by an
- * nn-size vector (column matrix) vv. Returns the nn-size vector
- * (column matrix) uu.
+/* Multiply mm x nn matrix mA (flat row-major) by vector vv (size nn).
+ * prod must be mm-sized and will be filled with results.
  */
-void matrix_vector_product(double ** mA, double * vv, 
-                                int mm, int nn, double * prod)
+void matrix_vector_product(const double *mA, const double *vv,
+                           const size_t mm, const size_t nn, double *prod)
 {
-    int ii, kk;
-    for (ii = 0; ii < mm; ii++)
-    {
-        prod[ii] = 0;
-        for (kk = 0; kk < nn; kk++)
-        {
-            prod[ii] += mA[ii][kk] * vv[kk];
+    if (!mA || !vv || !prod || mm == 0 || nn == 0) return;
+
+    for (size_t ii = 0; ii < mm; ++ii) {
+        double sum = 0.0;
+        for (size_t kk = 0; kk < nn; ++kk) {
+            sum += mA[ii * nn + kk] * vv[kk];
         }
+        prod[ii] = sum;
     }
 }
 
 
-/* Calculate the dot product of a line matrix mA and a
- * column matrix mB, given their size nn.
+/* Calculate the dot product of nn-size line matrix mA and
+ * column matrix mB.
  */
-double dot_product(double * mA, double * mB, int nn)
+double dot_product(const double *mA, const double *mB, const size_t nn)
 {
     double dprod = 0.0;
-    for (int ii = 0; ii < nn; ii++)
+    for (size_t ii = 0; ii < nn; ii++)
     {
         dprod += mA[ii] * mB[ii];
     }
@@ -83,13 +87,12 @@ double dot_product(double * mA, double * mB, int nn)
 }
 
 
-/* Add up the elements of a vector mA (column matrix),
-* given its size nn.
+/* Add up the elements of an nn sized vector mA (column matrix).
 */
-double vector_sum(double * mA, int nn)
+double vector_sum(const double *mA, const size_t nn)
 {
     double sum = 0.0;
-    for (int ii = 0; ii < nn; ii++)
+    for (size_t ii = 0; ii < nn; ii++)
     {
         sum += mA[ii];
     }
@@ -98,13 +101,15 @@ double vector_sum(double * mA, int nn)
 
 
 /* Calculate the dot product of a line matrix mA and a
- * column matrix mB, indexed by roi->idx.
+ * column matrix mB, indexed by roi->idx. The ROI skips
+ * certain elements.
  */
-double roi_dot_product(double * mA, double * mB, roi_struct * roi)
+double roi_dot_product(const double *mA, const double *mB,
+                       const roi_struct * roi)
 {
-    int idx;
     double dprod = 0.0;
-    for (int ii = 0; ii < roi->nsites; ii++)
+    size_t idx;
+    for (size_t ii = 0; ii < roi->nsites; ii++)
     {
         idx = roi->idx[ii];
         dprod += mA[idx] * mB[idx];
@@ -114,12 +119,13 @@ double roi_dot_product(double * mA, double * mB, roi_struct * roi)
 
 
 /* Add up the elements of a vector mA (column matrix)
- * indexed by roi->idx.
+ * indexed by roi->idx. The ROI skips
+ * certain elements.
  */
-double roi_vector_sum(double * mA, roi_struct * roi)
+double roi_vector_sum(const double *mA, const roi_struct * roi)
 {
     double sum = 0.0;
-    for (int ii = 0; ii < roi->nsites; ii++)
+    for (size_t ii = 0; ii < roi->nsites; ii++)
     {
         sum += mA[roi->idx[ii]];
     }

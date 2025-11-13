@@ -324,3 +324,6 @@ spectra_*
 XBPM_*
 beam_*
 tests*
+lib/
+mc_search
+res.dat

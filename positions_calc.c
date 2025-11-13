@@ -1,143 +1,87 @@
-#include "prm_def.h"
+// #include "prm_def.h"
 #include "matrix_operations.h"
 #include <stdlib.h>
 #include <math.h>
 
-// DEBUG
-// #include <stdio.h>
-// DEBUG
-
-
-/* Calculate linear coefficients k and delta for xp position scaling,
- * given real positions yp. The fitting is calculated within the roi.
- * Returns a struct with k and delta.
+/* Calculate positions (pos) by multiplying blades' measurements in dataset
+ * ds (to, ti, bi. bo) by the elements of the suppression matrix. Horizontal
+ * positions are calculated from the 8 first elements of supmat, vertical
+ * positions from the last 8 elements; the pointer to the first of those must
+ * be sent in each case.
  */
-kdelta positions_scaling (double * xp, double * yp, roi_struct * roi)
+void raw_positions_calc (const dataset * ds, const double * supmat,
+                         double * pos)
 {
-    kdelta kd;
+    double delta, sigma;
+    for (size_t ii = 0; ii < ds->nsites; ii++)
+    {
+        delta = supmat[0] * ds->to[ii]
+              + supmat[1] * ds->ti[ii] 
+              + supmat[2] * ds->bi[ii]
+              + supmat[3] * ds->bo[ii]; 
 
-    double sx2 = roi_dot_product(xp, xp, roi);
+        sigma = supmat[4] * ds->to[ii]
+              + supmat[5] * ds->ti[ii] 
+              + supmat[6] * ds->bi[ii]
+              + supmat[7] * ds->bo[ii]; 
+
+        pos[ii] = (delta / sigma);
+    }
+}
+
+
+/* Calculate linear coefficients k and delta for xp position scaling
+ * by least squares method, given real (nominal) positions yp.
+ * The fitting is calculated within the roi.
+ * Returns a struct with k and delta.
+ */ 
+kdelta positions_scaling (const double * xp, const double * yp,
+                          const roi_struct * roi)
+{                      
+    kdelta kd;
+    double nsites = (double) roi->nsites;
+
+    double sxx = roi_dot_product(xp, xp, roi);
     double sx  = roi_vector_sum(xp, roi);
-    double det = roi->nsites * sx2 - sx * sx;
+    double det = nsites * sxx - sx * sx;
 
     double sy  = roi_vector_sum(yp, roi);
     double sxy = roi_dot_product(xp, yp, roi);
 
-    // DEBUG
-    // printf(" (position scaling) : nsites = %d\n", roi->nsites);
-    // for (int ii = 0; ii < roi->nsites; ii++)
-    //     printf(">>> [%d : %d] xp = %lf, yp = %lf\n", ii, roi->idx[ii],
-    //             xp[roi->idx[ii]], yp[roi->idx[ii]]);
+    kd.delta = (sxx * sy - sx * sxy)    / det;
+    kd.k     = (sy - nsites * kd.delta) / sx;
 
-    // printf(" (position scaling) :\n");
-    // printf("  yp[15] = %lf\n", yp[15]);
-    // printf("      sx = %lf\n", sx);
-    // printf("     sx2 = %lf\n", sx2);
-    // printf("      sy = %lf\n", sy);
-    // printf("     sxy = %lf\n", sxy);
-    // printf("     det = %lf\n", det);
-    // DEBUG
+    return kd;
+}    
 
-    kd.delta = (sx2 * sy - sx * sxy) / det;
-    kd.k = (sy - roi->nsites * kd.delta) / sx;
 
-    // DEBUG
-    // printf("       k = %lf\n", kd.k);
-    // printf("   delta = %lf\n", kd.delta);
-    // DEBUG
+/* Calculate positions multiplying by coefficients of suppression matrix.
+ * Then scale calculated positions based on nominal positions.
+ */
+kdelta positions_calc (const dataset * ds, const double * supmat,
+                       const double * nompos, double * pos)
+{
 
+    
+    /* Calculate positions (whole grid) according to suppression matrix. */
+    raw_positions_calc(ds, supmat, pos);
+
+    /* Scale positions. Only the ROI is relevant for scaling. */
+    kdelta kd = positions_scaling(pos, nompos, &(ds->roi));
+
+    /* If scaling is not successful. */
+    if (isnan(kd.k) || isnan(kd.delta))
+    {
+        kd.k = 1.0;
+        kd.delta = 0.0;
+        return kd;
+    }
+    
+    for (size_t ii = 0; ii < ds->nsites; ii++)
+    {
+        pos[ii] = pos[ii] * kd.k + kd.delta;
+    }
+    
     return kd;
 }
 
-
-/* Calculate vertical positions vv based on pairwise formula.
- * The gain matrix gain_v is applied to the blades' values
- * provided by dataset ds.
- */
-void raw_positions_calc_v (dataset * ds, double * gain, double * pos)
-{
-    // double p0, p1, p2, p3;
-    double p1, p2;
-    for (int ii = 0; ii < ds->nsites; ii++)
-    {
-        p1 = fabs(gain[0]) * ds->to[ii] + fabs(gain[1]) * ds->ti[ii];
-        p2 = fabs(gain[2]) * ds->bi[ii] + fabs(gain[3]) * ds->bo[ii];
-        pos[ii] = (p1 - p2) / (p1 + p2);
-
-        // p0 = gain[0] * ds->to[ii];
-        // p1 = gain[1] * ds->ti[ii];
-        // p2 = gain[2] * ds->bi[ii];
-        // p3 = gain[3] * ds->bo[ii];
-        // pos[ii] = ((p0 + p3 - p1 - p2) /
-        //            (fabs(p0) + fabs(p1) + fabs(p2) + fabs(p3)));
-
-    }
-}
-
-
-/* Calculate horizontal positions hh based on pairwise formula.
- * The gain matrix gain_h is applied to the blades' values
- * provided by dataset ds.
- */
-void raw_positions_calc_h (dataset * ds, double * gain, double * pos)
-{
-    double p1, p2;
-    for (int ii = 0; ii < ds->nsites; ii++)
-    {
-        p1 = fabs(gain[0]) * ds->to[ii] + fabs(gain[3]) * ds->bo[ii];
-        p2 = fabs(gain[1]) * ds->ti[ii] + fabs(gain[2]) * ds->bi[ii];
-        pos[ii] = (p1 - p2) / (p1 + p2);
-
-        // p0 = gain[0] * ds->to[ii];
-        // p1 = gain[1] * ds->ti[ii];
-        // p2 = gain[2] * ds->bi[ii];
-        // p3 = gain[3] * ds->bo[ii];
-        // pos[ii] = ((p0 + p3 - p1 - p2) /
-        //            (fabs(p0) + fabs(p1) + fabs(p2) + fabs(p3)));
-
-    }
-}
-
-
-void positions_calc_h (dataset * ds, double * gain, double * pos)
-{
-    /* Calculate positions according to pairwise formula. */
-    raw_positions_calc_h(ds, gain, pos);
-
-    // DEBUG
-    // printf(" (pos calc h) RAW: pos H[0], H[5], H[10] = %lf / %lf / %lf\n\n",
-    //     pos[0], pos[5], pos[10]);
-    // DEBUG
-
-    /* Scale positions. */
-    kdelta kd = positions_scaling(pos, ds->nom_h, &(ds->roi));
-
-
-    // DEBUG
-    // printf(" (pos calc h) scaling: k, delta = %lf , %lf \n\n",
-    //     kd.k, kd.delta);
-    // DEBUG
-
-    if (isnan(kd.k) || isnan(kd.delta))
-        return;
-
-
-    for (int ii = 0; ii < ds->nsites; ii++)
-    {
-        pos[ii] = pos[ii] * kd.k - kd.delta;
-    }
-}
-
-
-void positions_calc_v (dataset * ds, double * gain, double * pos)
-{
-    /* Calculate positions according to pairwise formula. */
-    raw_positions_calc_v(ds, gain, pos);
-
-    /* Scale positions. */
-    kdelta kd = positions_scaling(pos, ds->nom_v, &(ds->roi));
-    for (int ii = 0; ii < ds->nsites; ii++)
-    {
-        pos[ii] = pos[ii] * kd.k - kd.delta;
-    }
-}

@@ -4,22 +4,14 @@
 #include <string.h>
 
 
-/* Define a structure for minimum and maximum.
- */
-typedef struct
-{
-    double min, max;
-} minmax;
-
-
 /* Return the minimum and maximum values of a vector vv of size nn.
  */
-minmax min_and_max (double * vv, int nn)
+minmax min_and_max (const double * vv, size_t nn)
 {
     minmax mm;
     mm.min = vv[0];
     mm.max = vv[0];
-    for (int ii = 1; ii < nn; ii++)
+    for (size_t ii = 1; ii < nn; ii++)
     {
         if (vv[ii] > mm.max)
             mm.max = vv[ii];
@@ -32,27 +24,27 @@ minmax min_and_max (double * vv, int nn)
 
 /* Check if a site has been visited. Used for debugging.
  */
-int site_visited (int * idx, int ic, int ivisit)
+int site_visited (size_t * idx, size_t ic, size_t ivisit)
 {
-    for (int ii = 0; ii < ic; ii++)
+    for (size_t ii = 0; ii < ic; ii++)
     {
         if (ivisit == idx[ii])
         {
-            printf(" True! ii = %d, ivisit = %d, idx = %d\n", 
+            printf(" True! ii = %zu, ivisit = %zu, idx = %zu\n",
                 ii, ivisit, idx[ii]);
             return 1;
         }
     }
-    printf(" False! ivisit = %d, idx = %d\n", ivisit, idx[ic]);
+    printf(" False! ivisit = %zu, idx = %zu\n", ivisit, idx[ic]);
     return 0;
 }
 
 
 /* Exchange the values of two integer variables (a and b).
  */
-void exchange_values(int * a, int * b)
+void exchange_values(size_t * a, size_t * b)
 {
-    int tmp = *a;
+    size_t tmp = *a;
     *a = *b;
     *b = tmp;
 }
@@ -65,17 +57,26 @@ void exchange_values(int * a, int * b)
  * positions given by the same index are correlated, namely, hh[i] and vv[i]
  * correspond to the same site.
  */
-int * index_order_by_position (double * hh, double * vv, int nsites)
+size_t * index_order_by_position (double * hh, double * vv, size_t nsites)
 {
-    int ic, jj, inext, icurr;
-    int * idx = calloc(nsites, sizeof(int));
     double next_h, next_v;
-
+    size_t ic, jj, inext, icurr;
+    
     /* Initialize index array. */
-    for (ic = 0; ic < nsites; ic++) { idx[ic] = ic; }
+    size_t * idx = calloc(nsites, sizeof(size_t));
+    if (idx == NULL)
+    {
+        printf(" ERROR (index_order_by_position):"
+            " could not allocate memory for index array. Aborting.\n");
+        exit(-1);
+    }
+
+    for (ic = 0; ic < nsites; ic++)
+    {
+        idx[ic] = ic;
+    }
 
     /* Run through coordinate arrays. */
-    idx[0] = 0;
     next_h = hh[0];
     next_v = vv[0];
     for (ic = 1; ic < nsites; ic++)
@@ -83,14 +84,14 @@ int * index_order_by_position (double * hh, double * vv, int nsites)
         icurr = ic;
         next_h =  hh[ic];
         next_v =  vv[ic];
-        inext  = idx[ic];
+        // inext  = idx[ic];
         for (jj = ic + 1; jj < nsites; jj++)
         {
             inext = idx[jj];
-            /* Next coordinate x is lesser than previous one. */
+            /* Next horizontal coordinate is lesser than previous one. */
             if (hh[inext] <= next_h)
             {
-                /* Next coordinate y is lesser than previous one. */
+                /* Next vertical coordinate is lesser than previous one. */
                 if (vv[inext] < next_v)  /* Guarantee no short circuit. */
                 {
                     next_h = hh[inext];
@@ -108,50 +109,86 @@ int * index_order_by_position (double * hh, double * vv, int nsites)
 
 /* Create an index structure for the ROI.
  */
-roi_struct roi_indexation (dataset * ds, xbpm_prm prm)
+roi_struct roi_indexation (const dataset * ds, xbpm_prm * prm)
 {
-    int   icount = 0;
-    int * roi_sites = calloc(ds->nsites, sizeof(int));
-    int   ord_idx;
-    roi_struct roi;
-
-    for (int ii = 0; ii < ds->nsites; ii++)
+    size_t ord_idx, ii;
+    size_t * roisite;
+    
+    minmax mm_h = min_and_max(ds->nom_h, ds->nsites);
+    minmax mm_v = min_and_max(ds->nom_v, ds->nsites);
+    if (prm->roi_from < mm_h.min || prm->roi_to > mm_h.max ||
+        prm->roi_from < mm_v.min || prm->roi_to > mm_v.max)
     {
-        ord_idx = ds->ord_sites[ii];
-        if (ds->nom_h[ord_idx] >= prm.roi_from && 
-            ds->nom_h[ord_idx] <= prm.roi_to)
-        {
-            if (ds->nom_v[ord_idx] >= prm.roi_from &&
-                ds->nom_v[ord_idx] <= prm.roi_to)
-            {
-                roi_sites[icount++] = ord_idx;
-            }
-        }
-
+        printf(" WARNING (roi_indexation): ROI interval [%.4lf, %.4lf]"
+               " is out of bounds.\n"
+               " Horizontal min/max = [%.4lf, %.4lf]\n"
+               " Vertical   min/max = [%.4lf, %.4lf]\n",
+               prm->roi_from, prm->roi_to,
+               mm_h.min, mm_h.max, mm_v.min, mm_v.max);
+        printf("Reseting ROI to safety range:\n");
+        prm->roi_from = (mm_h.min < mm_v.min) ? mm_h.min : mm_v.min;
+        prm->roi_to   = (mm_h.max < mm_v.max) ? mm_h.max : mm_v.max;
+        printf(" New ROI interval = [%.4lf, %.4lf]\n",
+                prm->roi_from, prm->roi_to);
     }
 
-    /* Copy indexed sites to roi structure. */
+    /* Initialize ROI structure. */
+    roi_struct roi;
+    roi.nsites = 0;
+    roi.idx = NULL;
+    roisite = calloc(ds->nsites, sizeof(size_t));
+    if (roisite == NULL)
+    {
+        printf(" ERROR (roi_indexation):"
+            " could not allocate memory for ROI index array. Aborting.\n");
+        exit(-1);
+    }
+
+    /* Run through all sites. */
+    size_t icount = 0;
+    for (ii = 0; ii < ds->nsites; ii++)
+    {
+        /* Index of grid-ordered sites. */
+        ord_idx = ds->ord_sites[ii];
+
+        /* Horizontal range. If site is within horizontal interval,
+         * check whether it is in vertical interval as well.*/
+        if (ds->nom_h[ord_idx] >= prm->roi_from && 
+            ds->nom_h[ord_idx] <= prm->roi_to)
+        {
+            /* Vertical range. If site is within vertical interval, 
+             * it is added to the ROI. */
+            if (ds->nom_v[ord_idx] >= prm->roi_from &&
+                ds->nom_v[ord_idx] <= prm->roi_to)
+            {
+                roisite[icount++] = ord_idx;
+            }
+        }
+    }
+
     roi.nsites = icount;
-    roi.idx    = calloc(roi.nsites, sizeof(int));
-    memcpy(roi.idx, roi_sites, roi.nsites * sizeof(int));
-    free(roi_sites);
+    roi.idx = calloc(roi.nsites, sizeof(size_t));
+    memcpy(roi.idx, roisite, roi.nsites * sizeof(size_t));
+    free(roisite);
     return roi;
 }
 
+
 /* Read matrix from file.
  */
-void matrix_read(char * matfile, double ** mat)
+void matrix_read(char * matfile, double * mat)
 {
-    int ii;
+    size_t ii;
     FILE * df = fopen(matfile, "r");
 
     for(ii = 0; ii < 4; ii++)
     {
         if(! fscanf(df, "%lf %lf %lf %lf",
-            &mat[ii][0], &mat[ii][1], &mat[ii][2], &mat[ii][3]))
+            &mat[4 * ii], &mat[4 * ii + 1],
+            &mat[4 * ii + 2], &mat[4 * ii + 3]))
         {
             printf(" WARNING (at matrix read) : could not read"
-                " from file %s at line (%d)", matfile, ii);
+                " from file %s at line (%zu)", matfile, ii);
         }
     }
     fclose(df);
@@ -160,43 +197,49 @@ void matrix_read(char * matfile, double ** mat)
 
 /* Read data from file.
  */
-dataset data_read(xbpm_prm prm)
+dataset data_read(xbpm_prm * prm)
 {
-    FILE * df = fopen(prm.datafile, "r");
+    FILE * df = fopen(prm->datafile, "r");
     char line[MAX_LINE];
     char * pd, * parse;
     dataset ds;
-    int ii = 0;
+    size_t nsite = 0;
     
     /* Check when opening data file. */
     if (df == NULL)
     {
-        perror(prm.datafile);
+        perror(prm->datafile);
         printf("##### (data_read) file: '%s'\n"
-            "ERROR: Aborting.\n\n", prm.datafile);
+            "ERROR: Aborting.\n\n", prm->datafile);
             exit(-1);
     }
 
     /* Allocate space for data. */
-    ds.nsites = prm.nsites;
+    ds.nsites = prm->nsites;
 
-    ds.nom_h = calloc(prm.nsites, sizeof(double));
-    ds.nom_v = calloc(prm.nsites, sizeof(double));
+    ds.nom_h = calloc(prm->nsites, sizeof(double));
+    ds.nom_v = calloc(prm->nsites, sizeof(double));
 
-    ds.to    = calloc(prm.nsites, sizeof(double));
-    ds.ti    = calloc(prm.nsites, sizeof(double));
-    ds.bi    = calloc(prm.nsites, sizeof(double));
-    ds.bo    = calloc(prm.nsites, sizeof(double));
+    ds.to    = calloc(prm->nsites, sizeof(double));
+    ds.ti    = calloc(prm->nsites, sizeof(double));
+    ds.bi    = calloc(prm->nsites, sizeof(double));
+    ds.bo    = calloc(prm->nsites, sizeof(double));
 
-    ds.sto   = calloc(prm.nsites, sizeof(double));
-    ds.sti   = calloc(prm.nsites, sizeof(double));
-    ds.sbi   = calloc(prm.nsites, sizeof(double));
-    ds.sbo   = calloc(prm.nsites, sizeof(double));
+    ds.sto   = calloc(prm->nsites, sizeof(double));
+    ds.sti   = calloc(prm->nsites, sizeof(double));
+    ds.sbi   = calloc(prm->nsites, sizeof(double));
+    ds.sbo   = calloc(prm->nsites, sizeof(double));
 
-
-    // DEBUG
-    // printf("\n>> (DATA READ) OK 1.\n");
-    // DEBUG
+    if (ds.nom_h == NULL || ds.nom_v == NULL ||
+        ds.to    == NULL || ds.ti    == NULL ||
+        ds.bi    == NULL || ds.bo    == NULL ||
+        ds.sto   == NULL || ds.sti   == NULL ||
+        ds.sbi   == NULL || ds.sbo   == NULL)
+    {
+        printf(" ERROR (data_read): could not allocate memory"
+            " for data arrays. Aborting.\n");
+        exit(-1);
+    }
 
     while (fgets(line, sizeof(line), df) != NULL)
     {
@@ -206,42 +249,25 @@ dataset data_read(xbpm_prm prm)
         if (line[0] == '\n')
             continue;
         
-        ds.nom_h[ii] = atof(strtok_r(parse, " ", &pd));
-        ds.nom_v[ii] = atof(strtok_r(NULL, " ", &pd));
+        ds.nom_h[nsite] = atof(strtok_r(parse, " ", &pd));
+        ds.nom_v[nsite] = atof(strtok_r(NULL, " ", &pd));
 
-        ds.to[ii]    = atof(strtok_r(NULL, " ", &pd));
-        ds.sto[ii]   = atof(strtok_r(NULL, " ", &pd));
+        ds.to[nsite]    = atof(strtok_r(NULL, " ", &pd));
+        ds.sto[nsite]   = atof(strtok_r(NULL, " ", &pd));
+        ds.ti[nsite]    = atof(strtok_r(NULL, " ", &pd));
+        ds.sti[nsite]   = atof(strtok_r(NULL, " ", &pd));
 
-        ds.ti[ii]    = atof(strtok_r(NULL, " ", &pd));
-        ds.sti[ii]   = atof(strtok_r(NULL, " ", &pd));
+        ds.bi[nsite]    = atof(strtok_r(NULL, " ", &pd));
+        ds.sbi[nsite]   = atof(strtok_r(NULL, " ", &pd));
 
-        ds.bi[ii]    = atof(strtok_r(NULL, " ", &pd));
-        ds.sbi[ii]   = atof(strtok_r(NULL, " ", &pd));
+        ds.bo[nsite]    = atof(strtok_r(NULL, " ", &pd));
+        ds.sbo[nsite]   = atof(strtok_r(NULL, " ", &pd));
 
-        ds.bo[ii]    = atof(strtok_r(NULL, " ", &pd));
-        ds.sbo[ii]   = atof(strtok_r(NULL, " ", &pd));
-
-        // DEBUG
-        // printf("\n>> (DATA READ) ii = %d\n", ii);
-        // DEBUG
-
-        ii++;
+        nsite++;
     }
-    
+
     ds.ord_sites = index_order_by_position(ds.nom_h, ds.nom_v, ds.nsites);
-    ds.roi       = roi_indexation(&ds, prm);
-
-    // DEBUG
-    /*
-    printf("\n\n##### (DATA READ) ROI: #####\n");
-    for (int ii = 0; ii < ds.roi.nsites; ii++)
-    {
-        printf(" ii = %.4d,  roi idx = %.4d -> ORD = %d \n",
-        ii, ds.roi.idx[ii], ds.ord_sites[ds.roi.idx[ii]]);
-    }
-    printf("\n\n ########### \n\n");
-    */
-    // DEBUG
+    ds.roi = roi_indexation(&ds, prm);
 
     fclose(df);
     return ds;

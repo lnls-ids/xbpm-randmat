@@ -5,33 +5,47 @@
 #include <string.h>
 #include <stdio.h>
 
-int positions_calc_h (dataset * ds, double * gain_h, double * hh);
-int positions_calc_v (dataset * ds, double * gain_v, double * vv);
+/* Temperature constant. Analogous to 1/kB. */
+#define Bk  1.0e7
+
+/* Prototype. Calculate positions from suppression matrix and
+ * blades' measurements.
+ */
+kdelta positions_calc (const dataset * ds, const double * supmat,
+                    double * nom_positions, double * positions);
 
 
 /* Change the value of an element of the gain array by a 'step'.
  */
-void mat_walk (double * gain, double step)
+void mat_walk (double * supmat, double step)
 {
-    int isite   = (int) (pcg_double() * 4);           /* Pick an element.  */
-    double sign = 1.0 ? -1.0 : (pcg_double() > 0.5);  /* Choose sign +/-.  */
-    gain[isite] += sign * step;         /* Increase step in element value. */
+    /* Pick an element.
+    */
+    int isite   = (int) (pcg_double() * 16);
+    /* Choose sign +/- (increase/decrease step).
+    */
+    double sign = 1.0 ? -1.0 : (pcg_double() > 0.5);
+    /* Add up in chosen matrix element value.
+    */
+    supmat[isite] += sign * step;
 }
 
 
 /* Chi-square of two vectors, v1 and v2, indexed by roi->idx.
  */
-double chi2_calc(double * v1, double * v2, roi_struct * roi)
+double chi2_calc(const double * v1, const double * v2,
+                 const roi_struct * roi)
 {
-    int ii, idx;
     double df, c2 = 0.0;
-    for (ii = 0; ii < roi->nsites; ii++)
+    size_t idx;
+    for (size_t ii = 0; ii < roi->nsites; ii++)
     {
         idx = roi->idx[ii];
         df  = v1[idx] - v2[idx];
         c2 += df *  df;
     }
-    return c2 / (roi->nsites - 1);
+    if (roi->nsites <= 1) return 0.0;
+    return c2 / ((double)(roi->nsites - 1));
 }
 
 
@@ -39,11 +53,17 @@ double chi2_calc(double * v1, double * v2, roi_struct * roi)
  */
 uint64_t seed_get()
 {
+    /* Open urandom device.
+    */
     FILE * sd = fopen("/dev/urandom", "rb");
     size_t nread;
     uint64_t buffer;
+
+    /* Read 8 bytes from urandom into buffer. */
     nread = fread(&buffer, 8, 1, sd);
     fclose(sd);
+
+    /* Warn if nothing read. */
     if (nread == 0)
     {
         printf("\n WARNING : nothing read from urandom.\n");
@@ -52,143 +72,139 @@ uint64_t seed_get()
 }
 
 
-int random_walk(dataset * ds, xbpm_prm * prm,
-                 double * gain_h, double * gain_v,
-                 double * pos_h, double * pos_v)
+/* Perform random walk to optimize suppression matrix.
+ */
+rw_stats random_walk(dataset * ds, xbpm_prm * prm, double * supmat,
+                   double * pos_h, double * pos_v)
 {
-    double * gain_h_tmp = calloc(4, sizeof(double));
-    double * gain_v_tmp = calloc(4, sizeof(double));
+    /* Counters. */
+    size_t ii = 0;
+    size_t accept = 0;
 
-    int ii = 0;
-    int accept = 0;
+    /* Inverse of temperature. */
+    double beta = prm->beta;
+    
+    /* Chi2 analysis.*/
+    double oldval;
+    double chi2_h, chi2_v, chi2_h_aft, chi2_v_aft;
+    double chi2, chi2_aft, dchi2;
 
-    double chi2_h_bef, chi2_v_bef, chi2_h_aft, chi2_v_aft;
-    double chi2_bef, chi2_aft, dchi2;
+    /* Probability.*/
     double prob;
 
+    /* Scaling parameters. */
+    kdelta kd;
+    
+    /* Initialize random seed. */
     uint64_t seed = seed_get();
     pcg32_init(seed);
-
-    /* Calculate positions. */
-    positions_calc_h(ds, gain_h, pos_h);
-    positions_calc_v(ds, gain_v, pos_v);
-
-    /* Measrurement of deviation: Chi2. */
-    chi2_h_bef = chi2_calc(ds->nom_h, pos_h, &ds->roi);
-    chi2_v_bef = chi2_calc(ds->nom_v, pos_v, &ds->roi);
-    chi2_bef   = (chi2_h_bef + chi2_v_bef) * 0.5;
-    chi2_h_aft = chi2_h_bef;
-    chi2_v_aft = chi2_v_bef;
-
-    // DEBUG
-    /*
-    printf("\n##### (random walk) BEFORE #####\n");
-    printf("\n\n >> gain << \n (random walk) H : \n");
-    for (int ii = 0; ii < 4 ; ii++)
-    printf(" %10.4f  ", gain_h[ii]);
-    printf("\n\n (random walk) V : \n ");
-    for (int ii = 0; ii < 4 ; ii++)
-    printf(" %10.4f  ", gain_v[ii]);
-    printf("\n\n");
-    printf(" (random walk) H, V = %lf / %lf\n\n", pos_h[5], pos_v[5]);
-    */
-    // DEBUG
+    
+    /* Calculate initial positions and deviation from nominal
+     * positions (chi2). */
+    positions_calc(ds, supmat, ds->nom_h, pos_h);
+    chi2_h = chi2_calc(ds->nom_h, pos_h, &ds->roi);
+    
+    positions_calc(ds, supmat + 8, ds->nom_v, pos_v);
+    chi2_v = chi2_calc(ds->nom_v, pos_v, &ds->roi);
+    
+    chi2_h_aft = chi2_h;
+    chi2_v_aft = chi2_v;
+    chi2       = (chi2_h + chi2_v) * 0.5;
+    chi2_aft   = chi2;
 
     /* Try to change the matrix nrand times. */
+    size_t imat_h = 0;
+    size_t imat_v = 0;
+    size_t isite = 0;
+    double sign = 1.0;
     for (ii = 0; ii < prm->nrand; ii++)
     {
-        /* Choose between a horizontal or vertical change. */
-        if (pcg_double() < 0.5)
+        /* Pick an element of the suppression matrix. */
+        isite = (size_t) (pcg_double() * 16);
+
+        /* Choose sign (increase/decrease step).      */
+        sign = (pcg_double() > 0.5) ? -1.0 : 1.0;
+        /* Add up in chosen matrix element value.     */
+        oldval = supmat[isite];
+        supmat[isite] += sign * prm->step;
+
+        /* Skip if new value would be zero. */
+        if (supmat[isite] == 0.0) 
         {
-            memcpy(gain_h_tmp, gain_h, 4 * sizeof(double));
-            mat_walk(gain_h_tmp, prm->step);
-            positions_calc_h(ds, gain_h_tmp, pos_h);
-            chi2_h_aft = chi2_calc(ds->nom_h, pos_h, &ds->roi);
-        } 
-        else 
-        {
-            memcpy(gain_v_tmp, gain_v, 4 * sizeof(double));
-            mat_walk(gain_v_tmp, prm->step);
-            positions_calc_v(ds, gain_v_tmp, pos_v);
-            chi2_v_aft = chi2_calc(ds->nom_v, pos_v, &ds->roi);
+            supmat[isite] = oldval;
+            continue;
         }
 
-        // DEBUG
-        /*
-        printf(" pos 0: H, V = %lf / %lf\n ", pos_h[0], pos_v[0]);
-        for (int jj = 0; jj < 4; jj++)
+        /* Recalculate positions and chi2. Check h and v separately.
+         * Minimization step takes only ROI into account. */ 
+        if (isite < 8)
         {
-            printf("h = %lf ", gain_h_tmp[jj]);
-            printf("v = %lf ", gain_v_tmp[jj]);
+            imat_h++;
+            kd = positions_calc(ds, supmat, ds->nom_h, pos_h);
+            chi2_h_aft = chi2_calc(ds->nom_h, pos_h, &ds->roi);            
+        }
+        else
+        {
+            kd = positions_calc(ds, supmat + 8, ds->nom_v, pos_v);
+            chi2_v_aft = chi2_calc(ds->nom_v, pos_v, &ds->roi);
+            imat_v++;
         }
         
-        printf(" (random walk) chi2 = %lf , %lf\n", chi2_h_aft, chi2_v_aft);
-        */
-        // DEBUG
-
+        /* If the scaling failed, reject change. */
+        if (kd.k == 1.0) 
+        {
+            printf("\n");
+            continue;
+        }
+           
         /* Calculate the change in chi2. */
         chi2_aft = (chi2_h_aft + chi2_v_aft) * 0.5;
-        dchi2    = chi2_aft - chi2_bef;
-        prob     = exp(-dchi2 / prm->temp);
-        if (prob > 1.0)
-            prob = 1.0;
-
-        // DEBUG
-        /*
-        printf(" (random walk) AFT >> dchi2 = %lf - %lf = %lf ←→ %lf\n\n",
-        chi2_aft, chi2_bef, dchi2, exp(-dchi2 / prm->temp));
-        prob = (dchi2 < 0.0) ? 1.0 : exp(-dchi2 / prm->temp);
-        printf(" (random walk) >> prob = %lf ←→ %Lg\n", prob, pcg_double());
-        */
-        // DEBUG
+        dchi2    = chi2_aft - chi2;
+        /* Probability of acceptance. */
+        prob = exp(-dchi2 * beta * Bk);
+        /* probability = min(1, prob). */
+        if (prob > 1.0) prob = 1.0;
 
         /* Accept or reject change. */
-        if (pcg_double() < prob)
+        if (pcg_double() <= prob)
         {
             /* If change is accomplished, copy state values 
-             * to former variables and reduce temperature.
-             */
-            memcpy(gain_h, gain_h_tmp, 4 * sizeof(double));
-            memcpy(gain_v, gain_v_tmp, 4 * sizeof(double));
-            prm->temp *= 0.999;
-            chi2_h_bef = chi2_h_aft;
-            chi2_v_bef = chi2_v_aft;
-            chi2_bef = chi2_aft;
+             * to former variables and reduce temperature. */
+            chi2 = chi2_aft;
+            chi2_h = chi2_h_aft;
+            chi2_v = chi2_v_aft;
             accept++;
+            // beta *= 0.999;
+            beta *= 1.001;
+        }
+        else
+        {
+            /* If change is rejected, restore former value. */
+            supmat[isite] = oldval;
+            chi2_aft = chi2;
+            chi2_h_aft = chi2_h;
+            chi2_v_aft = chi2_v;
+            beta *= 0.999;
         }
     }
 
-    // DEBUG
+    /* Final positions. */
+    positions_calc(ds, supmat, ds->nom_h, pos_h);
+    positions_calc(ds, supmat + 8, ds->nom_v, pos_v);
+
+    // DEBUG : print ROI
     /*
-    printf(" gain: \n");
-    for (int jj = 0; jj < 4; jj++)
+    printf("\n\n##### (RANDOM WALK) ROI: #####\n");
+    for (size_t ii = 0; ii < ds->roi.nsites; ii++)
     {
-        printf("H gain %d → %lf\t", jj, gain_h[jj]);
-        printf("V gain %d → %lf\n", jj, gain_v[jj]);
+        printf(" %10.4f %10.4f",
+               ds->nom_h[ds->roi.idx[ii]], ds->nom_v[ds->roi.idx[ii]]);
+        printf(" %10.4f %10.4f\n",
+               pos_h[ds->roi.idx[ii]], pos_v[ds->roi.idx[ii]]);
     }
-    */
-    // DEBUG
-
-    /* Final posistions. */
-    positions_calc_h(ds, gain_h, pos_h);
-    positions_calc_v(ds, gain_v, pos_v);
-
-    // DEBUG
-    /*
-    printf("\n\n\n##### (random walk) AFTER #####\n");
-    printf("\n\n >> gain << \n");
-    for (int ii = 0; ii < 4 ; ii++)
-    printf(" %10.4f  ", gain_h[ii]);
     printf("\n");
-    for (int ii = 0; ii < 4 ; ii++)
-    printf(" %10.4f  ", gain_v[ii]);
-    printf("\n\n");
-    printf("pos H, V = %lf / %lf\n\n", pos_h[5], pos_v[5]);
     */
     // DEBUG
 
-    free(gain_h_tmp);
-    free(gain_v_tmp);
-
-    return accept;
+    return (rw_stats) {imat_h, imat_v, accept, beta};
 }
