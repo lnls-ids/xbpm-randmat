@@ -9,10 +9,6 @@ void positions_print(const dataset * ds,
                     const double * hh, const double * vv,
                     const char * outfile)
 {
-    // DEBUG
-    // printf("\n##### (POSITIONS PRINT): outfile = %s #####\n", outfile);
-    // DEBUG
-
     FILE * fout = NULL;
     if (outfile != NULL && strlen(outfile) > 0)
     {

@@ -13,7 +13,7 @@ typedef struct
     int nrand;                  /* Number of random trials.       */
     size_t nsites;              /* Number of sites in the grid.   */
     double roi_from, roi_to;    /* Interval that defines the ROI. */
-    double temp;                /* Temperature.                   */
+    double beta;                /* Inverse of temperature.        */
     double step;                /* Random step size.              */
     char outfile[256];          /* Output file name.              */
 } xbpm_prm;
@@ -52,6 +52,22 @@ typedef struct
 {
     double k, delta;
 } kdelta;
+
+/* Random walk statistics.
+ */
+typedef struct
+{
+    size_t imat_h, imat_v;   /* Number of changes in H and V. */
+    size_t accept;           /* Number of accepted changes.   */
+    double beta;             /* Final inverse temperature.    */
+} rw_stats;
+
+/* Define a structure for minimum and maximum.
+ */
+typedef struct
+{
+    double min, max;
+} minmax;
 
 
 /* The basic suppression matrix, defining the signals for horizontal 

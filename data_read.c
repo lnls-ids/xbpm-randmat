@@ -4,17 +4,9 @@
 #include <string.h>
 
 
-/* Define a structure for minimum and maximum.
- */
-typedef struct
-{
-    double min, max;
-} minmax;
-
-
 /* Return the minimum and maximum values of a vector vv of size nn.
  */
-minmax min_and_max (double * vv, size_t nn)
+minmax min_and_max (const double * vv, size_t nn)
 {
     minmax mm;
     mm.min = vv[0];
@@ -140,11 +132,6 @@ roi_struct roi_indexation (const dataset * ds, xbpm_prm * prm)
                 prm->roi_from, prm->roi_to);
     }
 
-    // DEBUG
-    // printf("##### (ROI INDEXATION) ROI interval = [%.4lf, %.4lf]\n",
-    //     prm->roi_from, prm->roi_to);
-    // DEBUG
-
     /* Initialize ROI structure. */
     roi_struct roi;
     roi.nsites = 0;
@@ -182,25 +169,6 @@ roi_struct roi_indexation (const dataset * ds, xbpm_prm * prm)
     roi.nsites = icount;
     roi.idx = calloc(roi.nsites, sizeof(size_t));
     memcpy(roi.idx, roisite, roi.nsites * sizeof(size_t));
-
-
-    // DEBUG
-    // printf("\n##### (ROI INDEXATION) ROI sites: #####\n");
-    // for (size_t ii = 0; ii < roi.nsites; ii++)
-    // {
-    //     ord_idx = roi.idx[ii];
-    //     printf(" ii = %04zu,  roi idx = %04zu -> ORD = %zu ->",
-    //            ii, ord_idx, ds->ord_sites[ord_idx]);
-    //     printf(" h = %lf, v = %lf ::", ds->nom_h[ord_idx], ds->nom_v[ord_idx]);
-    //     printf(" to = %lf, ti = %lf, bo = %lf, bi = %lf \n",
-    //            ds->to[ord_idx], ds->ti[ord_idx],
-    //            ds->bo[ord_idx], ds->bi[ord_idx]);
-    // }
-    // printf("\n\n ########### \n\n");
-    // fflush(stdout);
-    // DEBUG
-
-
     free(roisite);
     return roi;
 }
@@ -273,10 +241,6 @@ dataset data_read(xbpm_prm * prm)
         exit(-1);
     }
 
-    // DEBUG
-    // printf("\n>> (DATA READ) OK 1.\n");
-    // DEBUG
-
     while (fgets(line, sizeof(line), df) != NULL)
     {
         parse = line;
@@ -299,40 +263,11 @@ dataset data_read(xbpm_prm * prm)
         ds.bo[nsite]    = atof(strtok_r(NULL, " ", &pd));
         ds.sbo[nsite]   = atof(strtok_r(NULL, " ", &pd));
 
-        // DEBUG
-        // printf("\n>> (DATA READ) nsites = %zu\n", nsite);
-        // DEBUG
-
         nsite++;
     }
 
-    // DEBUG
-    // printf("\n\n##### (DATA READ) ROI: #####\n");
-    // for (size_t ii = 0; ii < nsite; ii++)
-    // {
-    //     printf(" ii = %04zu,  h = %lf, v = %lf \n",
-    //            ii, ds.nom_h[ii], ds.nom_v[ii]);
-    // }
-    // printf("\n\n ########### \n\n");
-    // fflush(stdout);
-    // DEBUG
-    
-
     ds.ord_sites = index_order_by_position(ds.nom_h, ds.nom_v, ds.nsites);
-    ds.roi       = roi_indexation(&ds, prm);
-
-    // DEBUG
-    // printf("\n\n##### (DATA READ) ROI: #####\n");
-    // for (size_t idx, ii = 0; ii < ds.roi.nsites; ii++)
-    // {
-    //     idx = ds.roi.idx[ii];
-    //     printf(" ii = %04zu,  roi idx = %04zu -> ORD = %zu ->",
-    //             ii, idx, ds.ord_sites[idx]);
-    //     printf(" h = %lf, v = %lf \n", ds.nom_h[idx], ds.nom_v[idx]);
-    // }
-    // printf("\n\n ########### \n\n");
-    // fflush(stdout);
-    // DEBUG
+    ds.roi = roi_indexation(&ds, prm);
 
     fclose(df);
     return ds;

@@ -16,10 +16,10 @@ void help(void);
 void parameters_initialize (xbpm_prm * prm)
 {
     prm->nrand    =  10000;
-    prm->temp     =    1.0;
+    prm->beta     =    1.0;
     prm->step     =  1.e-5;
-    prm->roi_from =   -8.0;
-    prm->roi_to   =    8.0;
+    prm->roi_from =   -4.0;
+    prm->roi_to   =    4.0;
     prm->nsites   =      0;
     strcpy(prm->datafile, "");
     strcpy(prm->matfile, "");
@@ -53,7 +53,7 @@ xbpm_prm parameters_read (int argc, char **argv)
         switch (opt)
         {
         case 'b':                    /* Inverse of temperature. */
-            prm.temp = optarg[0];
+            prm.beta = atof(optarg);
             break;
         
         case 'd':                   /* Input data file. */
@@ -85,7 +85,7 @@ xbpm_prm parameters_read (int argc, char **argv)
             break;
         
         case 'r':                    /* Number of random changes. */
-            prm.nrand = (int) atoi(optarg);
+            prm.nrand = (int) atof(optarg);
             break;
 
         case 's':                    /* Step size. */

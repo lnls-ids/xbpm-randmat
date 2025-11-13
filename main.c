@@ -19,8 +19,8 @@ double * matrix_read(char * matfile, double * supmat);
 dataset data_read(xbpm_prm * prm);
 
 /* Perform a random walk with the gain matrix. */
-size_t random_walk(dataset * ds, xbpm_prm * prm, double * supmat,
-    double * pos_h, double * pos_v);
+rw_stats random_walk(dataset * ds, xbpm_prm * prm, double * supmat,
+                     double * pos_h, double * pos_v);
 
 /* Print coordinates of sites. */
 void positions_print(const dataset * ds,
@@ -30,13 +30,16 @@ void positions_print(const dataset * ds,
 kdelta positions_calc(const dataset * ds, const double * supmat,
                       const double * nompos, double * pos);
 
-/* Basic suppression matrix. */
+/* Basic suppression matrix.
+ * It represents the usual delta/sigma calculation.
+ */
 double supmat_signs[16] = {
     1.0,   1.0,  -1.0,  -1.0,
     1.0,   1.0,   1.0,   1.0,
     1.0,  -1.0,  -1.0,   1.0,
     1.0,   1.0,   1.0,   1.0
 };
+
 
 /* Read suppresssion matrix.
  */
@@ -72,7 +75,7 @@ void matrix_show (double * mat, size_t nn, size_t mm)
     {
         for (jj = 0; jj < mm; jj++)
         {
-            printf(" %12.6lf  ", mat[ii * mm + jj]);
+            printf(" %10.6lf  ", mat[ii * mm + jj]);
         }
         printf("\n");
     }
@@ -83,15 +86,30 @@ void matrix_show (double * mat, size_t nn, size_t mm)
 /* Print scaling parameters.
  */
 void scaling_params_print (kdelta kdh, kdelta kdv,
-                           size_t accept, size_t nrand)
+                           rw_stats rws, size_t nrand)
 {
-    printf("\n Rescaling parameters:");
-    printf("\n Horizontal: k = %lf, delta = %lf\n", kdh.k, kdh.delta);
-    printf("\n Vertical:   k = %lf, delta = %lf\n", kdv.k, kdv.delta);
-    printf("\n Acceptance rate: %lf %% \n",
-           ((double) accept / (double) nrand) * 100.0);
+    printf("##### Rescaling parameters:");
+    printf("\n Horizontal:\n"
+           "    k     = %12.6lf,\n    delta = %12.6lf", kdh.k, kdh.delta);
+    printf("\n\n Vertical:\n"
+           "    k     = %12.6lf,\n    delta = %12.6lf", kdv.k, kdv.delta);
+
+    printf("\n\n##### Random walk statistics."
+           "\n Total matrix changes H = %.2lf %%",
+           (double) rws.imat_h / (double) nrand * 100.0);
+    printf("\n Total matrix changes V = %.2lf %%",
+           (double) rws.imat_v / (double) nrand * 100.0);
+    printf("\n Acceptance rate        = %6.2lf %%",
+           ((double) rws.accept / (double) nrand) * 100.0);
+    printf("\n Final temperature      = %.4g \t(beta = %.4g)\n\n",
+           1/rws.beta, rws.beta);
+
+
+    // printf("\n Acceptance rate: %12.4lf %% \n\n",
+    //        ((double) accept / (double) nrand) * 100.0);
     printf("\n");
 }
+
 
 /* Free up allocated memory. */
 void dataset_free (dataset * ds, double * supmat,
@@ -127,7 +145,7 @@ int main(int argc, char **argv)
 
     /* Read initial suppression matrix from file if provided. */
     double * supmat = suppression_matrix_read(prm.matfile);
-    printf("\n##### Input matrix:\n");
+    printf("##### Input matrix:\n");
     matrix_show(supmat, 4, 4);
 
     /* Perform the random walk of suppression matrix's elements. */
@@ -139,10 +157,10 @@ int main(int argc, char **argv)
                " for position arrays. Aborting.\n");
         exit(-1);
     }
-    size_t accept = random_walk(&ds, &prm, supmat, pos_h, pos_v);
+    rw_stats rws = random_walk(&ds, &prm, supmat, pos_h, pos_v);
 
     /* Show modified matrix. */
-    printf("\n##### Modified matrix:\n");
+    printf("##### Modified matrix:\n");
     matrix_show(supmat, 4, 4);
 
     /* Rescale positions. */
@@ -153,7 +171,7 @@ int main(int argc, char **argv)
     positions_print(&ds, pos_h, pos_v, prm.outfile);
 
     /* Print final scaling parameters. */
-    scaling_params_print(kdh, kdv, accept, prm.nrand);
+    scaling_params_print(kdh, kdv, rws, prm.nrand);
 
     /* Free up allocated memory. */
     dataset_free(&ds, supmat, pos_h, pos_v);
