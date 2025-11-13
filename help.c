@@ -32,6 +32,11 @@ void help (void)
     "\n If no initial matrix is provided, the program starts with a standard"
     "\n matrix, whose gains/suppressions are equal to 1."
     "\n"
+    "\n Obs.: (Important) Check the signs of the initial matrix elements,"
+    "\n       they must correspond to the usual delta/sigma calculation"
+    "\n       (two first rows correspond to horizontal position calculation,"
+    "\n       the last two to vertical)."
+    "\n"
   );
  
   exit(0);
