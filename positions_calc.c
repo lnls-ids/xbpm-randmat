@@ -59,7 +59,7 @@ kdelta positions_scaling (const double * xp, const double * yp,
  * Then scale calculated positions based on nominal positions.
  */
 kdelta positions_calc (const dataset * ds, const double * supmat,
-                       const double * nompos, double * pos)
+                       const double * nominal_pos, double * pos)
 {
 
     
@@ -67,7 +67,7 @@ kdelta positions_calc (const dataset * ds, const double * supmat,
     raw_positions_calc(ds, supmat, pos);
 
     /* Scale positions. Only the ROI is relevant for scaling. */
-    kdelta kd = positions_scaling(pos, nompos, &(ds->roi));
+    kdelta kd = positions_scaling(pos, nominal_pos, &(ds->roi));
 
     /* If scaling is not successful. */
     if (isnan(kd.k) || isnan(kd.delta))

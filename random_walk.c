@@ -109,7 +109,7 @@ rw_stats random_walk(dataset * ds, xbpm_prm * prm, double * supmat,
     
     chi2_h_aft = chi2_h;
     chi2_v_aft = chi2_v;
-    chi2       = (chi2_h + chi2_v) * 0.5;
+    chi2       = (chi2_h + chi2_v);
     chi2_aft   = chi2;
 
     /* Try to change the matrix nrand times. */
@@ -139,12 +139,14 @@ rw_stats random_walk(dataset * ds, xbpm_prm * prm, double * supmat,
          * Minimization step takes only ROI into account. */ 
         if (isite < 8)
         {
-            imat_h++;
+            /* Horizontal changes. */
             kd = positions_calc(ds, supmat, ds->nom_h, pos_h);
             chi2_h_aft = chi2_calc(ds->nom_h, pos_h, &ds->roi);            
+            imat_h++;
         }
         else
         {
+            /* Vertical changes. */
             kd = positions_calc(ds, supmat + 8, ds->nom_v, pos_v);
             chi2_v_aft = chi2_calc(ds->nom_v, pos_v, &ds->roi);
             imat_v++;
@@ -158,10 +160,12 @@ rw_stats random_walk(dataset * ds, xbpm_prm * prm, double * supmat,
         }
            
         /* Calculate the change in chi2. */
-        chi2_aft = (chi2_h_aft + chi2_v_aft) * 0.5;
+        chi2_aft = (chi2_h_aft + chi2_v_aft);
         dchi2    = chi2_aft - chi2;
+
         /* Probability of acceptance. */
         prob = exp(-dchi2 * beta * Bk);
+
         /* probability = min(1, prob). */
         if (prob > 1.0) prob = 1.0;
 
@@ -189,7 +193,7 @@ rw_stats random_walk(dataset * ds, xbpm_prm * prm, double * supmat,
     }
 
     /* Final positions. */
-    positions_calc(ds, supmat, ds->nom_h, pos_h);
+    positions_calc(ds, supmat,     ds->nom_h, pos_h);
     positions_calc(ds, supmat + 8, ds->nom_v, pos_v);
 
     // DEBUG : print ROI
