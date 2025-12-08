@@ -79,7 +79,7 @@ rw_stats random_walk(dataset * ds, xbpm_prm * prm, double * supmat,
 {
     /* Counters. */
     size_t ii = 0;
-    size_t accept = 0;
+    size_t accept = 0, old_accept = 0;
 
     /* Inverse of temperature. */
     double beta = prm->beta;
@@ -88,6 +88,7 @@ rw_stats random_walk(dataset * ds, xbpm_prm * prm, double * supmat,
     double oldval;
     double chi2_h, chi2_v, chi2_h_aft, chi2_v_aft;
     double chi2, chi2_aft, dchi2;
+    double daccept;
 
     /* Probability.*/
     double prob;
@@ -177,9 +178,8 @@ rw_stats random_walk(dataset * ds, xbpm_prm * prm, double * supmat,
             chi2 = chi2_aft;
             chi2_h = chi2_h_aft;
             chi2_v = chi2_v_aft;
+            old_accept = accept;
             accept++;
-            // beta *= 0.999;
-            beta *= 1.001;
         }
         else
         {
@@ -188,7 +188,20 @@ rw_stats random_walk(dataset * ds, xbpm_prm * prm, double * supmat,
             chi2_aft = chi2;
             chi2_h_aft = chi2_h;
             chi2_v_aft = chi2_v;
-            beta *= 0.999;
+        }
+
+        /* Decide whether to decrease temperature. */
+        if (ii % 1000 == 0)
+        {
+            daccept = (double)(accept - old_accept) / 1000.0;
+            if (daccept < 0.1)
+            {
+                beta *= 1.1;
+            }
+            old_accept = accept;
+
+            /* Reduce step size based on acceptance rate. */
+            prm->step /= 1.0 + log2(1.0 + daccept);
         }
     }
 

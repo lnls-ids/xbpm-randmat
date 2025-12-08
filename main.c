@@ -86,9 +86,9 @@ void matrix_show (double * mat, size_t nn, size_t mm)
 /* Print scaling parameters.
  */
 void scaling_params_print (kdelta kdh, kdelta kdv,
-                           rw_stats rws, size_t nrand)
+                           rw_stats rws, size_t nrand, double step)
 {
-    printf("##### Rescaling parameters:");
+    printf("\n##### Rescaling parameters:");
     printf("\n Horizontal:\n"
            "    k     = %12.6lf,\n    delta = %12.6lf", kdh.k, kdh.delta);
     printf("\n\n Vertical:\n"
@@ -101,9 +101,9 @@ void scaling_params_print (kdelta kdh, kdelta kdv,
            (double) rws.imat_v / (double) nrand * 100.0);
     printf("\n Acceptance rate        = %6.2lf %%",
            ((double) rws.accept / (double) nrand) * 100.0);
-    printf("\n Final temperature      = %.4g \t(beta = %.4g)\n\n",
+    printf("\n Final temperature      = %.4g \t(beta = %.4g)",
            1/rws.beta, rws.beta);
-
+    printf("\n Final step size        = %.4g \n\n", step);
 
     // printf("\n Acceptance rate: %12.4lf %% \n\n",
     //        ((double) accept / (double) nrand) * 100.0);
@@ -171,7 +171,7 @@ int main(int argc, char **argv)
     positions_print(&ds, pos_h, pos_v, prm.outfile);
 
     /* Print final scaling parameters. */
-    scaling_params_print(kdh, kdv, rws, prm.nrand);
+    scaling_params_print(kdh, kdv, rws, prm.nrand, prm.step);
 
     /* Free up allocated memory. */
     dataset_free(&ds, supmat, pos_h, pos_v);
