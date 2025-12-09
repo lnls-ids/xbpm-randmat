@@ -8,6 +8,9 @@
 /* Temperature constant. Analogous to 1/kB. */
 #define Bk  1.0e7
 
+/* Acceptance rate check interval (iterations). */
+#define ACCEPT_CHECK_INTERVAL  250
+
 /* Prototype. Calculate positions from suppression matrix and
  * blades' measurements.
  */
@@ -191,12 +194,12 @@ rw_stats random_walk(dataset * ds, xbpm_prm * prm, double * supmat,
         }
 
         /* Decide whether to decrease temperature. */
-        if (ii % 1000 == 0)
+        if (ii % ACCEPT_CHECK_INTERVAL == 0 && ii > 0)
         {
-            daccept = (double)(accept - old_accept) / 1000.0;
+            daccept = (double)(accept - old_accept) / ACCEPT_CHECK_INTERVAL;
             if (daccept < 0.1)
             {
-                beta *= 1.1;
+                beta *= 1.01;
             }
             old_accept = accept;
 
