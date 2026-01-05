@@ -21,10 +21,10 @@ void help (void)
     "\n  -s <changes size> : step size of random changes in the"
     "\n                      suppression matrix elements (default = 1e-5)"
     "\n"
-    "\n The data is a 10-column text; the two first columns are the nominal"
-    "\n positions. The other eight are the values measured by each blade"
-    "\n with respective errors. The sequence of blades is:"
-    "\n top out, top in, bottom in, bottom out."
+    "\n The data must be a 10-column text: the two first columns are the"
+    "\n nominal positions; the other four pairs of columns are the values
+    "\n measured by each blade with their respective estimated errors.
+    "\n The sequence of blades is: top out, top in, bottom in, bottom out."
     "\n"
     "\n The initial and last indices of the ROI are the positions of the"
     "\n ROI's boundaries. It defines the optimal adjustment domain."
