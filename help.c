@@ -22,8 +22,8 @@ void help (void)
     "\n                      suppression matrix elements (default = 1e-5)"
     "\n"
     "\n The data must be a 10-column text: the two first columns are the"
-    "\n nominal positions; the other four pairs of columns are the values
-    "\n measured by each blade with their respective estimated errors.
+    "\n nominal positions; the other four pairs of columns are the values"
+    "\n measured by each blade with their respective estimated errors."
     "\n The sequence of blades is: top out, top in, bottom in, bottom out."
     "\n"
     "\n The initial and last indices of the ROI are the positions of the"
@@ -40,4 +40,4 @@ void help (void)
   );
  
   exit(0);
-}
+}q
