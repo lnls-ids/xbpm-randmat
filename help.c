@@ -40,4 +40,4 @@ void help (void)
   );
  
   exit(0);
-}q
+}
